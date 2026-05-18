@@ -80,3 +80,4 @@ no build step.
 | Username doesn't show | The export structure varies; the dashboard falls back to the zip filename. Rename your zip to `instagram-USERNAME-DATE.zip` if needed. |
 | Page is blank | Open the browser console (Cmd+Opt+J on Chrome). If you see a CDN error, run `sh run.sh` and use <http://localhost:8000>. |
 # instagram-analytics
+# instagram-analytics
