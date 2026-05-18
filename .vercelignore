@@ -1,0 +1,16 @@
+cloudflared
+cloudflared.exe
+cloudflared.tgz
+data/
+server.py
+run.sh
+tunnel.sh
+*.log
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.local
+*.local

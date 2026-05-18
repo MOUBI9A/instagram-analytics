@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Privacy Policy — Pulse Instagram Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 720px; margin: 48px auto; padding: 0 20px; color: #0f172a; line-height: 1.55; }
+    h2 { margin-top: 0; color: #a21caf; }
+    h3 { margin-top: 1.6em; color: #475569; }
+    code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 0.92em; }
+    a { color: #a21caf; }
+    .meta { color: #64748b; font-size: 0.85em; border-top: 1px solid #e2e8f0; margin-top: 36px; padding-top: 16px; }
+    ul { padding-left: 22px; }
+    li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h2>Privacy Policy</h2>
+  <p>Pulse Instagram Analytics is software for analyzing Instagram accounts. It can run on the
+  user's own machine, on a self-hosted server, or on a hosted instance the user controls. Data
+  handling depends on which mode is in use.</p>
+
+  <h3>Data collected</h3>
+  <ul>
+    <li>Instagram usernames that the user explicitly looks up.</li>
+    <li>Public profile data and recent public posts returned by Instagram for those usernames.</li>
+    <li>OAuth access tokens, when the user opts into the Facebook Login / Instagram Graph API flow.</li>
+    <li>AI API keys for whichever AI provider the user configures (Gemini, Groq, OpenAI, or Anthropic).</li>
+  </ul>
+
+  <h3>Where data is stored</h3>
+  <ul>
+    <li><strong>Local-server mode:</strong> Lookup results are cached on the user's machine under <code>./data/lookups/</code>. Nothing is sent to a third party.</li>
+    <li><strong>Hosted-serverless mode (e.g. Vercel):</strong> No persistent cache. Each request is a fresh call to Instagram from the serverless function. Nothing is stored on the host between requests.</li>
+    <li><strong>Browser state:</strong> OAuth tokens, AI API keys, watchlist, concept-studio history, and theme preferences live only in the user's browser <code>localStorage</code>.</li>
+  </ul>
+
+  <h3>Data sharing</h3>
+  <p>No data is shared with third parties. The dashboard communicates only with: Instagram (for lookups),
+  Meta / Facebook (for OAuth, when the user explicitly opts in), and the user's chosen AI provider
+  (for AI-powered features, when the user explicitly configures an API key).</p>
+
+  <h3>Deletion</h3>
+  <p>To remove cached data: delete the <code>./data/lookups/</code> folder (local-server mode) or clear
+  your browser storage. To revoke Meta access: visit
+  <a href="https://www.facebook.com/settings?tab=business_tools">facebook.com/settings → Business Integrations</a>.</p>
+
+  <h3>Cookies</h3>
+  <p>The dashboard itself sets no cookies. The Facebook JS SDK may set cookies during the OAuth flow
+  if the user opts into Live API mode.</p>
+
+  <h3>Contact</h3>
+  <p>Reach the operator of this specific instance directly.</p>
+
+  <p class="meta"><a href="/">← back to app</a> · <a href="/terms">Terms of Service</a></p>
+</body>
+</html>

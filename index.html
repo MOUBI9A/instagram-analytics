@@ -477,7 +477,29 @@
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-3 mt-5">
+          <!-- engine toggle -->
+          <div class="mt-5 flex flex-wrap items-center gap-3 p-3 rounded-xl bg-black/30 border border-white/5">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+              <i data-lucide="cpu" class="w-4 h-4 text-fuchsia-300 shrink-0"></i>
+              <div class="min-w-0">
+                <div class="text-[11px] uppercase tracking-wider text-slate-400">Engine</div>
+                <div id="concepts-engine-label" class="text-xs text-slate-300">Rule-based · instant · free</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="concepts-engine-rules" class="concept-filter-btn active" data-engine="rules">Rule-based</button>
+              <button id="concepts-engine-ai" class="concept-filter-btn" data-engine="ai">
+                <i data-lucide="sparkles" class="w-3 h-3 inline mr-0.5"></i>AI-powered
+              </button>
+            </div>
+          </div>
+          <div id="concepts-ai-key-warning" class="hidden mt-2 text-xs text-amber-200 bg-amber-500/8 border border-amber-400/25 rounded-lg px-3 py-2">
+            AI mode needs an API key. Open the
+            <button id="concepts-go-ai-key" class="underline text-fuchsia-300 hover:text-fuchsia-200">AI panel</button>
+            (or press <kbd class="px-1 py-0.5 rounded bg-black/40 text-[10px]">Cmd+K</kbd> → "AI") and paste a free Gemini or Groq key. Then come back here.
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 mt-3">
             <button
               id="concepts-generate-btn"
               class="px-5 py-2.5 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow-lg shadow-pink-500/20 transition inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"

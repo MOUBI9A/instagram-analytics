@@ -5842,51 +5842,81 @@ function showLiveErrorWithHint(msg) {
   setWizardPill($("wizard-connect-status"), "error", "Failed");
 }
 
+function isHostedHttpsDeploy() {
+  return location.protocol === "https:" &&
+    !["localhost", "127.0.0.1", "0.0.0.0"].includes(location.hostname);
+}
+
 function initMetaConnectWizard() {
   if (!$("meta-wizard")) return;
 
-  // initial paste-card population
-  updateWizardPasteCards(null);
+  const httpsDeploy = isHostedHttpsDeploy();
 
-  // tunnel controls
-  $("wizard-tunnel-start").addEventListener("click", async () => {
-    setWizardPill($("wizard-tunnel-status"), "active", "Starting…");
-    $("wizard-tunnel-error").classList.add("hidden");
-    try {
-      const r = await fetch("/api/tunnel/start", { method: "POST" });
-      const s = await r.json();
-      applyTunnelStatus(s);
-      startTunnelPolling();
-      // continue polling until we get a URL
-      if (s.status !== "running") {
-        const interval = setInterval(async () => {
-          const st = await pollTunnelStatus();
-          applyTunnelStatus(st);
-          if (st && (st.status === "running" || st.status === "error" || st.status === "stopped")) clearInterval(interval);
-        }, 1000);
+  if (httpsDeploy) {
+    // On a hosted HTTPS deploy, the tunnel step is unnecessary.
+    // Replace Step 1's body with a "Already HTTPS" notice and pre-fill the paste cards.
+    const step1 = document.querySelector('.wizard-step[data-step="1"]');
+    if (step1) {
+      step1.classList.add("done");
+      const body = step1.querySelector(".wizard-step-body");
+      if (body) {
+        body.innerHTML = `
+          <div class="flex items-start gap-2 text-xs text-emerald-200 bg-emerald-500/8 border border-emerald-400/25 rounded-lg p-3">
+            <i data-lucide="check-circle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+            <div>
+              <strong>Already HTTPS.</strong> This deployment is on <code class="bg-black/30 px-1 rounded">${escapeHtml(location.hostname)}</code> —
+              no tunnel needed. Use Step 2 below to copy the URLs into your Meta App.
+            </div>
+          </div>`;
       }
-    } catch (e) {
-      setWizardPill($("wizard-tunnel-status"), "error", "Error");
-      $("wizard-tunnel-error").classList.remove("hidden");
-      $("wizard-tunnel-error").textContent = "Failed to talk to the local server: " + e.message;
+      setWizardPill($("wizard-tunnel-status"), "done", "HTTPS deploy");
     }
-  });
+    updateWizardPasteCards(location.origin);
+  } else {
+    // Local-server mode: full tunnel-controls wiring.
+    updateWizardPasteCards(null);
 
-  $("wizard-tunnel-stop").addEventListener("click", async () => {
-    try {
-      const r = await fetch("/api/tunnel/stop", { method: "POST" });
-      const s = await r.json();
-      applyTunnelStatus(s);
-    } catch {}
-  });
+    $("wizard-tunnel-start").addEventListener("click", async () => {
+      setWizardPill($("wizard-tunnel-status"), "active", "Starting…");
+      $("wizard-tunnel-error").classList.add("hidden");
+      try {
+        const r = await fetch("/api/tunnel/start", { method: "POST" });
+        const s = await r.json();
+        applyTunnelStatus(s);
+        startTunnelPolling();
+        if (s.status !== "running") {
+          const interval = setInterval(async () => {
+            const st = await pollTunnelStatus();
+            applyTunnelStatus(st);
+            if (st && (st.status === "running" || st.status === "error" || st.status === "stopped")) clearInterval(interval);
+          }, 1000);
+        }
+      } catch (e) {
+        setWizardPill($("wizard-tunnel-status"), "error", "Error");
+        $("wizard-tunnel-error").classList.remove("hidden");
+        $("wizard-tunnel-error").textContent = "Failed to talk to the local server: " + e.message;
+      }
+    });
 
-  $("wizard-tunnel-copy").addEventListener("click", () => {
-    const v = $("wizard-tunnel-url").value;
-    if (v) {
-      navigator.clipboard.writeText(v).catch(() => {});
-      flash("wizard-tunnel-copy", "Copied ✓");
-    }
-  });
+    $("wizard-tunnel-stop").addEventListener("click", async () => {
+      try {
+        const r = await fetch("/api/tunnel/stop", { method: "POST" });
+        const s = await r.json();
+        applyTunnelStatus(s);
+      } catch {}
+    });
+
+    $("wizard-tunnel-copy").addEventListener("click", () => {
+      const v = $("wizard-tunnel-url").value;
+      if (v) {
+        navigator.clipboard.writeText(v).catch(() => {});
+        flash("wizard-tunnel-copy", "Copied ✓");
+      }
+    });
+
+    // initial state: poll once on load to discover already-running tunnel
+    pollTunnelStatus().then(applyTunnelStatus);
+  }
 
   // paste-card copy buttons
   document.querySelectorAll(".wizard-paste-copy").forEach(btn => {
@@ -5908,10 +5938,8 @@ function initMetaConnectWizard() {
   // creds pill react to input
   $("appid-input").addEventListener("input", refreshCredsPill);
 
-  // initial state: poll once on load to discover already-running tunnel
-  pollTunnelStatus().then(applyTunnelStatus);
-
   refreshCredsPill();
+  if (window.lucide) window.lucide.createIcons();
 
   // step 2 marker: when user has pasted URLs into Meta + step 1 done, step 2 is implicitly ready.
   // We watch for App ID save → mark step 2 done as best-effort.
@@ -5978,7 +6006,23 @@ const conceptStudioState = {
   lastResults: null,           // last generated concept list (for copy-all)
   serverCacheLoaded: false,    // whether we've fetched /api/cache/list
   groupBy: "none",
+  engine: "rules",             // "rules" or "ai"
 };
+
+// Pull the AI provider/key/model the user already configured in the AI panel.
+// Returns null if no usable key exists.
+function getAiCreds() {
+  const provider = localStorage.getItem("ig_ai_provider_v1") || "gemini";
+  const key = localStorage.getItem(`ig_ai_key_${provider}_v1`) || localStorage.getItem("ig_ai_key_v1") || "";
+  const model = localStorage.getItem(`ig_ai_model_${provider}_v1`) ||
+    (typeof AI_MODELS !== "undefined" ? AI_MODELS[provider]?.[0]?.id : "");
+  if (!key || !model || !provider) return null;
+  return { provider, key, model };
+}
+
+function aiProviderLabel(provider) {
+  return ({ gemini: "Gemini", groq: "Groq", openai: "OpenAI", anthropic: "Claude" })[provider] || provider;
+}
 
 // ---------- history (persistent) ----------
 function loadConceptHistory() {
@@ -6502,6 +6546,223 @@ function tierFor(followers) {
   return "macro";
 }
 
+// ---------- AI-powered concept generator ----------
+// Sends the analyses to /api/ai with a structured prompt, parses the JSON
+// response, and runs each concept through the local estimateViews() to keep
+// the numbers calibrated to the real follower counts.
+function buildAiConceptPrompt(analyses, filters, dna) {
+  const accountSummaries = analyses.map(a => ({
+    username: a.account.username,
+    full_name: a.account.full_name,
+    followers: a.account.followers,
+    posts_count: a.account.posts_count,
+    engagement_rate_pct: +a.engagementRate.toFixed(2),
+    median_likes: a.medianLikes,
+    median_comments: a.medianComments,
+    biography: (a.account.biography || "").slice(0, 280),
+    category: a.account.category || "",
+    is_business: a.account.is_business,
+    strongest_format: a.strongestFormat,
+    format_mix: a.formatMix,
+    top_hashtags: a.topHashtags.slice(0, 10),
+    top_keywords: a.topKeywords.slice(0, 12),
+    best_post_hour: a.bestHour,
+    posting_cadence_days: a.medianGap ? +a.medianGap.toFixed(1) : null,
+    top_post_captions: a.top.slice(0, 5).map(p => ({
+      engagement: (p.likes || 0) + (p.comments || 0),
+      caption: (p.caption || "").slice(0, 240),
+      format: p.is_video ? "reel" : (p.is_carousel ? "carousel" : "photo"),
+    })),
+  }));
+
+  const formats = [...filters.format].join(", ") || "reel, carousel, photo";
+  const tones = [...filters.tone].join(", ") || "educational, entertaining";
+  const ambitions = [...filters.ambition].join(", ") || "safe, growth";
+
+  const system = [
+    "You are a senior Instagram content strategist who has grown multiple accounts to 7-figure followings.",
+    "You analyze a set of accounts and propose CONCRETE, NON-GENERIC content concepts that match each account's actual audience and style.",
+    "You never propose vague ideas like 'post more reels'. Every concept must have: a specific title, a specific hook, the exact format, suggested hashtags, and a sentence on why it works for THIS account.",
+    "You ALWAYS respond with a strict JSON array — no prose, no markdown fence, no explanation. Just the array."
+  ].join("\n");
+
+  const fusionNote = analyses.length >= 2
+    ? "\n- Include at least 2 FUSION concepts that combine 2+ of the selected accounts (collab Reels, shared-niche carousels, etc.)."
+    : "";
+
+  const user = `Generate exactly 10 Instagram content concepts tailored to these accounts:
+
+${JSON.stringify(accountSummaries, null, 2)}
+
+Constraints:
+- Allowed formats: ${formats}
+- Allowed tones: ${tones}
+- Allowed ambition levels: ${ambitions} (safe = close to what works now; growth = stretch; viral = high-ceiling)
+- Each concept must reference a specific keyword, hashtag, or pattern from the account data above — no generic ideas.${fusionNote}
+
+Return a JSON array of 10 objects with EXACTLY these fields:
+[
+  {
+    "title": "string (max 80 chars, no trailing period)",
+    "hook": "string (max 140 chars, the actual opening line of the post or reel)",
+    "why": "string (max 220 chars, why this works for THIS account, reference a specific number/keyword/hashtag from the data)",
+    "format": "one of: reel, carousel, photo, story",
+    "tone": "one of: educational, entertaining, inspiring, promotional",
+    "ambition": "one of: safe, growth, viral",
+    "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
+    "for_account": "the username this concept targets (or 'username1 × username2' for fusion)",
+    "fusion": false
+  }
+]
+
+Reminder: respond with ONLY the JSON array. No prose. No markdown fence.`;
+
+  return { system, user };
+}
+
+function parseAiConceptResponse(text) {
+  if (!text) return [];
+  // strip markdown fences if present
+  let s = text.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) s = fence[1].trim();
+  // find first [ ... ] block
+  const first = s.indexOf("[");
+  const last = s.lastIndexOf("]");
+  if (first === -1 || last === -1 || last < first) return [];
+  s = s.slice(first, last + 1);
+  try {
+    const arr = JSON.parse(s);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(c => c && typeof c === "object" && c.title && c.format);
+  } catch {
+    // attempt a salvage: chunk by `}` then parse each obj
+    const out = [];
+    const parts = s.split(/\}\s*,\s*\{/);
+    for (let i = 0; i < parts.length; i++) {
+      let chunk = parts[i];
+      if (i > 0) chunk = "{" + chunk;
+      if (i < parts.length - 1) chunk = chunk + "}";
+      try {
+        const obj = JSON.parse(chunk.replace(/^\[/, "").replace(/\]$/, ""));
+        if (obj && obj.title) out.push(obj);
+      } catch {}
+    }
+    return out;
+  }
+}
+
+async function callAi(creds, system, user) {
+  // /api/ai shape (matches existing handle_ai server route):
+  //   { provider, model, api_key, prompt, context }
+  // The server concatenates system + prompt + context. We pack system+user into prompt and leave context empty.
+  const payload = {
+    provider: creds.provider,
+    model: creds.model,
+    api_key: creds.key,
+    prompt: system + "\n\n---\n\n" + user,
+    context: "",
+  };
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.text || "";
+}
+
+async function generateConceptsViaAi(selectedUsernames, filters) {
+  const history = loadConceptHistory();
+  let accounts = selectedUsernames.map(u => history[u.toLowerCase()]).filter(Boolean);
+  if (filters.tier && filters.tier !== "all") {
+    accounts = accounts.filter(a => tierFor(a.followers || 0) === filters.tier);
+  }
+  if (!accounts.length) return { concepts: [], summary: null, dna: null, source: "ai" };
+
+  const analyses = accounts.map(analyzeAccount);
+  const dna = {
+    hooks: extractHooks(analyses, 5),
+    patterns: detectViralPatterns(analyses),
+    actions: generateMatchedActions(analyses),
+  };
+
+  const creds = getAiCreds();
+  if (!creds) throw new Error("No AI key configured. Open the AI panel and paste a Gemini, Groq, OpenAI, or Claude key.");
+
+  const { system, user } = buildAiConceptPrompt(analyses, filters, dna);
+  const raw = await callAi(creds, system, user);
+  const rawConcepts = parseAiConceptResponse(raw);
+
+  if (!rawConcepts.length) {
+    throw new Error("AI returned an unparseable response. Falling back to rule-based.");
+  }
+
+  // calibrate views using local estimator and attach metadata the renderer needs
+  const concepts = [];
+  for (const c of rawConcepts) {
+    if (!filters.format.has(c.format)) continue;
+    if (!filters.tone.has(c.tone)) continue;
+    if (!filters.ambition.has(c.ambition)) continue;
+
+    // pick the analysis closest to the target username
+    const target = (c.for_account || "").split(/\s*[×x]\s*/i)[0].replace(/^@/, "").toLowerCase();
+    const lead = analyses.find(a => a.account.username.toLowerCase() === target) || analyses[0];
+    let est = estimateViews(lead, c.format, c.ambition);
+    if (c.fusion && analyses.length >= 2) {
+      const boost = 1.4;
+      est = { low: Math.round(est.low * boost), mid: Math.round(est.mid * boost), high: Math.round(est.high * boost) };
+    }
+    concepts.push({
+      title: String(c.title).slice(0, 120),
+      hook: String(c.hook || ""),
+      why: String(c.why || ""),
+      format: c.format,
+      tone: c.tone,
+      ambition: c.ambition,
+      hashtags: Array.isArray(c.hashtags) ? c.hashtags.slice(0, 8) : [],
+      forAccount: c.for_account || lead.account.username,
+      accountFollowers: lead.account.followers,
+      bestHour: lead.bestHour,
+      estimate: est,
+      confidence: confidenceFor(lead, { format: c.format }),
+      fusion: !!c.fusion,
+    });
+  }
+
+  // apply minViews filter
+  const minViews = filters.minViews || 0;
+  const filtered = minViews ? concepts.filter(c => c.estimate.high >= minViews) : concepts;
+  filtered.sort((a, b) => b.estimate.mid - a.estimate.mid);
+
+  // summary stays the same
+  const totalFollowers = analyses.reduce((s, a) => s + a.account.followers, 0);
+  const avgER = analyses.reduce((s, a) => s + a.engagementRate, 0) / analyses.length;
+  const formatTotals = { reel: 0, carousel: 0, photo: 0 };
+  for (const a of analyses) {
+    formatTotals.reel += a.formatMedian.reel;
+    formatTotals.carousel += a.formatMedian.carousel;
+    formatTotals.photo += a.formatMedian.photo;
+  }
+  const strongest = Object.entries(formatTotals).sort((a, b) => b[1] - a[1])[0][0];
+
+  return {
+    concepts: filtered,
+    summary: {
+      followers: totalFollowers,
+      er: avgER,
+      strongest,
+      theme: detectBestThemeAcrossAccounts(analyses),
+      accountCount: analyses.length,
+    },
+    dna,
+    source: "ai",
+    aiProvider: creds.provider,
+    aiModel: creds.model,
+  };
+}
+
 // ---------- main generator ----------
 function generateConcepts(selectedUsernames, filters) {
   const history = loadConceptHistory();
@@ -6725,6 +6986,22 @@ function readConceptFilters() {
 const FORMAT_ICON = { reel: "film", carousel: "layers", photo: "image", story: "circle-dot" };
 const FORMAT_LABEL = { reel: "Reel", carousel: "Carousel", photo: "Photo", story: "Story" };
 
+function flashConceptsBanner(text) {
+  // Transient inline banner above the results — auto-dismisses
+  let banner = document.getElementById("concepts-flash-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "concepts-flash-banner";
+    banner.className = "mt-3 mb-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-400/25 text-xs text-amber-200 flex items-center gap-2";
+    const wrap = $("concepts-results");
+    if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(banner, wrap);
+  }
+  banner.innerHTML = `<i data-lucide="info" class="w-3.5 h-3.5"></i><span class="flex-1">${escapeHtml(text)}</span>`;
+  if (window.lucide) window.lucide.createIcons();
+  clearTimeout(banner._t);
+  banner._t = setTimeout(() => banner.remove(), 6000);
+}
+
 function renderConceptResults(result) {
   conceptStudioState.lastResults = result;
   const wrap = $("concepts-results");
@@ -6738,6 +7015,10 @@ function renderConceptResults(result) {
     $("concepts-sum-format").textContent = FORMAT_LABEL[result.summary.strongest] || "—";
     $("concepts-sum-theme").textContent = result.summary.theme;
     $("concepts-export-btn").classList.remove("hidden");
+    // attach an "engine" badge so the user knows where these came from
+    if (result.source === "ai") {
+      flashConceptsBanner(`Generated by ${aiProviderLabel(result.aiProvider)} (${result.aiModel}). View estimates are still locally calibrated to follower counts.`);
+    }
   } else {
     $("concepts-summary").classList.add("hidden");
     $("concepts-export-btn").classList.add("hidden");
@@ -6949,12 +7230,61 @@ function initConceptStudio() {
     setMode("lookup");
     $("lookup-input").focus();
   });
+  // engine toggle (Rule-based vs AI-powered)
+  function applyEngineToggle() {
+    const btnRules = $("concepts-engine-rules");
+    const btnAi = $("concepts-engine-ai");
+    const label = $("concepts-engine-label");
+    const warning = $("concepts-ai-key-warning");
+    btnRules.classList.toggle("active", conceptStudioState.engine === "rules");
+    btnAi.classList.toggle("active", conceptStudioState.engine === "ai");
+    if (conceptStudioState.engine === "rules") {
+      label.textContent = "Rule-based · instant · free";
+      warning.classList.add("hidden");
+    } else {
+      const creds = getAiCreds();
+      if (creds) {
+        label.textContent = `${aiProviderLabel(creds.provider)} · ${creds.model}`;
+        warning.classList.add("hidden");
+      } else {
+        label.textContent = "AI-powered · no key configured";
+        warning.classList.remove("hidden");
+      }
+    }
+  }
+  $("concepts-engine-rules").addEventListener("click", () => {
+    conceptStudioState.engine = "rules";
+    applyEngineToggle();
+  });
+  $("concepts-engine-ai").addEventListener("click", () => {
+    conceptStudioState.engine = "ai";
+    applyEngineToggle();
+  });
+  $("concepts-go-ai-key").addEventListener("click", () => {
+    setMode("lookup");
+    setTimeout(() => {
+      const ai = document.querySelector("#ai-key") || document.querySelector("[id^='ai-']");
+      if (ai && ai.scrollIntoView) ai.scrollIntoView({ behavior: "smooth", block: "center" });
+      const keyInput = $("ai-key");
+      if (keyInput) keyInput.focus();
+    }, 200);
+  });
+  applyEngineToggle();
+
   $("concepts-generate-btn").addEventListener("click", async () => {
     const selected = [...conceptStudioState.selected];
     if (!selected.length) return;
     const btn = $("concepts-generate-btn");
+    const wantAi = conceptStudioState.engine === "ai";
+    const creds = wantAi ? getAiCreds() : null;
+    if (wantAi && !creds) {
+      $("concepts-ai-key-warning").classList.remove("hidden");
+      return;
+    }
     btn.disabled = true;
-    btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>Analyzing…`;
+    btn.innerHTML = wantAi
+      ? `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>Asking ${aiProviderLabel(creds.provider)}…`
+      : `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>Analyzing…`;
     if (window.lucide) window.lucide.createIcons();
 
     // Hydrate any thin (server-cache-only) records before analysis
@@ -6963,14 +7293,39 @@ function initConceptStudio() {
     if (toHydrate.length) {
       await Promise.all(toHydrate.map(u => hydrateAccountFromCache(u)));
     }
-    // Defer to next frame so the spinner paints
-    setTimeout(() => {
-      const result = generateConcepts(selected, readConceptFilters());
+
+    const filters = readConceptFilters();
+
+    const finish = (result, fallbackBanner) => {
       renderConceptResults(result);
       btn.disabled = false;
       btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i>Generate concepts`;
       if (window.lucide) window.lucide.createIcons();
-    }, 80);
+      if (fallbackBanner) flashConceptsBanner(fallbackBanner);
+    };
+
+    if (wantAi) {
+      try {
+        const aiResult = await generateConceptsViaAi(selected, filters);
+        if (!aiResult.concepts.length) {
+          // AI returned nothing usable — fallback
+          const rb = generateConcepts(selected, filters);
+          finish(rb, "AI returned no concepts; showing rule-based instead.");
+        } else {
+          finish(aiResult);
+        }
+      } catch (e) {
+        console.warn("AI concepts failed:", e);
+        const rb = generateConcepts(selected, filters);
+        finish(rb, `AI mode failed (${e.message}). Showing rule-based instead.`);
+      }
+    } else {
+      // small defer so the spinner paints
+      setTimeout(() => {
+        const result = generateConcepts(selected, filters);
+        finish(result);
+      }, 60);
+    }
   });
   $("concepts-export-btn").addEventListener("click", copyAllConcepts);
 }
