@@ -587,49 +587,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json({"error": "no cached data", "available": False}, 404)
 
         try:
-            data = fetch_web_profile_info(username)
-            cache_write(username, data)
+            data = fetch_with_fallbacks(username)
+            # Only write to cache when we got real (non-partial) data
+            if not data.get("partial"):
+                cache_write(username, data)
+            elif cached and data.get("partial"):
+                # merge cached posts into a partial result so the dashboard stays useful
+                data = merge_with_cache(data, cached)
+                data["served_from_cache_age"] = int(time.time()) - (cached.get("cached_at") or 0)
             return self.send_json(data, 200)
-        except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 429):
-                # rate-limited / auth-required → try OG, then merge with cache
-                try:
-                    fallback = fetch_og_only(username)
-                    fallback["partial"] = True
-                    fallback["note"] = (
-                        "Instagram rate-limited rich data; showing basic counts only. "
-                        "Wait a few minutes and try again."
-                    )
-                    if cached:
-                        fallback = merge_with_cache(fallback, cached)
-                        fallback["served_from_cache_age"] = int(time.time()) - (cached.get("cached_at") or 0)
-                    return self.send_json(fallback, 200)
-                except Exception:
-                    # OG also failed — fall back to pure cache if we have one
-                    if cached:
-                        cached["from_cache"] = True
-                        cached["partial"] = True
-                        cached["note"] = "Instagram rate-limited fresh fetch. Showing your last cached snapshot."
-                        cached["served_from_cache_age"] = int(time.time()) - (cached.get("cached_at") or 0)
-                        return self.send_json(cached, 200)
-                    return self.send_json({"error": f"rate limited: {e.code}"}, 502)
-            # any other upstream error: fall back to cache if we have one
-            if cached:
-                cached["from_cache"] = True
-                cached["partial"] = True
-                cached["note"] = f"Upstream error {e.code}; showing cached snapshot."
-                cached["served_from_cache_age"] = int(time.time()) - (cached.get("cached_at") or 0)
-                return self.send_json(cached, 200)
-            return self.send_json({"error": f"upstream {e.code}: {e.reason}"}, 502)
         except Exception as e:
-            # network/parse error — fall back to cache if available
+            # All strategies failed — fall back to cache if available
             if cached:
                 cached["from_cache"] = True
                 cached["partial"] = True
-                cached["note"] = f"Fetch failed ({e}); showing cached snapshot."
+                cached["note"] = f"All endpoints rate-limited ({e}); showing cached snapshot."
                 cached["served_from_cache_age"] = int(time.time()) - (cached.get("cached_at") or 0)
                 return self.send_json(cached, 200)
-            return self.send_json({"error": str(e)}, 500)
+            return self.send_json({"error": str(e), "available": False}, 502)
 
     def handle_cache_list(self):
         return self.send_json({"accounts": cache_list()}, 200)
@@ -690,8 +665,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 
+import random as _random
+
+# Rotate UAs — Instagram is more aggressive against a fixed UA
+DESKTOP_UAS = [
+    UA,
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+]
+MOBILE_UA = "Instagram 295.0.0.32.119 Android (33/13; 420dpi; 1080x2208; samsung; SM-G991B; o1s; exynos2100; en_US; 502173050)"
+
+
+def _pick_ua():
+    return _random.choice(DESKTOP_UAS)
+
+
 def http_get_json(url, headers=None):
-    req = urllib.request.Request(url, headers=headers or {"User-Agent": UA})
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": _pick_ua()})
     with urllib.request.urlopen(req, timeout=15) as resp:
         raw = resp.read()
         if resp.headers.get("Content-Encoding") == "gzip":
@@ -700,7 +691,7 @@ def http_get_json(url, headers=None):
 
 
 def http_get_text(url, headers=None):
-    req = urllib.request.Request(url, headers=headers or {"User-Agent": UA})
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": _pick_ua()})
     with urllib.request.urlopen(req, timeout=15) as resp:
         raw = resp.read()
         if resp.headers.get("Content-Encoding") == "gzip":
@@ -708,20 +699,42 @@ def http_get_text(url, headers=None):
         return raw.decode("utf-8", errors="replace")
 
 
+def _try_with_retries(fn, max_attempts=3, base_delay=1.0):
+    last_err = None
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code in (401, 403, 429):
+                time.sleep(base_delay * (2 ** attempt) + _random.uniform(0, 0.5))
+                continue
+            raise
+        except Exception as e:
+            last_err = e
+            time.sleep(base_delay)
+    if last_err:
+        raise last_err
+    raise RuntimeError("retries exhausted")
+
+
 def fetch_web_profile_info(username):
     url = (
         f"https://www.instagram.com/api/v1/users/web_profile_info/"
         f"?username={urllib.parse.quote(username)}"
     )
-    raw = http_get_json(
-        url,
-        headers={
-            "User-Agent": UA,
-            "Accept": "*/*",
-            "x-ig-app-id": WEB_APP_ID,
-            "Referer": f"https://www.instagram.com/{username}/",
-        },
-    )
+    def _do():
+        return http_get_json(
+            url,
+            headers={
+                "User-Agent": _pick_ua(),
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "x-ig-app-id": WEB_APP_ID,
+                "Referer": f"https://www.instagram.com/{username}/",
+            },
+        )
+    raw = _try_with_retries(_do, max_attempts=2)
     user = (raw.get("data") or {}).get("user")
     if not user:
         raise RuntimeError("Account not found or response missing user")
@@ -789,6 +802,45 @@ def fetch_web_profile_info(username):
         "related_profiles": related,
         "fetched_at": int(__import__("time").time()),
         "available": True,
+        "_source": "web_profile_info",
+    }
+
+
+def fetch_mobile_api(username):
+    """Strategy 2: i.instagram.com mobile endpoint — different rate-limit pool."""
+    url = f"https://i.instagram.com/api/v1/users/web_profile_info/?username={urllib.parse.quote(username)}"
+    def _do():
+        return http_get_json(url, headers={
+            "User-Agent": MOBILE_UA,
+            "Accept": "*/*",
+            "x-ig-app-id": WEB_APP_ID,
+            "Accept-Language": "en-US",
+        })
+    raw = _try_with_retries(_do, max_attempts=2)
+    user = (raw.get("data") or {}).get("user") or raw.get("user")
+    if not user:
+        raise RuntimeError("mobile API: empty user")
+    return {
+        "username": user.get("username") or username,
+        "full_name": user.get("full_name", ""),
+        "biography": user.get("biography") or "",
+        "external_url": user.get("external_url"),
+        "category": user.get("category_name") or user.get("business_category_name"),
+        "is_verified": bool(user.get("is_verified")),
+        "is_private": bool(user.get("is_private")),
+        "is_business": bool(user.get("is_business_account")),
+        "is_professional": bool(user.get("is_professional_account")),
+        "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url"),
+        "followers": (user.get("edge_followed_by") or {}).get("count") or user.get("follower_count") or 0,
+        "following": (user.get("edge_follow") or {}).get("count") or user.get("following_count") or 0,
+        "posts_count": (user.get("edge_owner_to_timeline_media") or {}).get("count") or user.get("media_count") or 0,
+        "has_clips": bool(user.get("has_clips")),
+        "id": user.get("id") or user.get("pk"),
+        "posts": [],
+        "related_profiles": [],
+        "fetched_at": int(time.time()),
+        "available": True,
+        "_source": "i_instagram",
     }
 
 
@@ -822,7 +874,45 @@ def fetch_og_only(username):
     if img_m:
         out["profile_pic_url"] = img_m.group(1)
     out["available"] = bool(out.get("followers") is not None or out.get("username"))
+    out["_source"] = "og_only"
     return out
+
+
+def fetch_with_fallbacks(username):
+    """Try strategies in order until one succeeds. Returns the richest result.
+
+    Strategy 1: web_profile_info (full posts + bio)
+    Strategy 2: i.instagram.com mobile API (counts only, different rate-limit pool)
+    Strategy 3: OG meta scrape (basic counts only, no posts)
+    """
+    errors = []
+    try:
+        return fetch_web_profile_info(username)
+    except urllib.error.HTTPError as e:
+        errors.append(f"web_profile_info: HTTP {e.code}")
+    except Exception as e:
+        errors.append(f"web_profile_info: {e}")
+
+    try:
+        result = fetch_mobile_api(username)
+        result["partial"] = True
+        result["note"] = "Web endpoint rate-limited; counts came from mobile API. Posts will load on next retry."
+        result["fetch_errors"] = errors
+        return result
+    except urllib.error.HTTPError as e:
+        errors.append(f"mobile_api: HTTP {e.code}")
+    except Exception as e:
+        errors.append(f"mobile_api: {e}")
+
+    try:
+        result = fetch_og_only(username)
+        result["partial"] = True
+        result["note"] = "All API endpoints rate-limited; basic data from OG tags."
+        result["fetch_errors"] = errors
+        return result
+    except Exception as e:
+        errors.append(f"og_only: {e}")
+        raise RuntimeError("All strategies failed: " + " | ".join(errors))
 
 
 def parse_count(s):

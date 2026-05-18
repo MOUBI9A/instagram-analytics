@@ -1403,11 +1403,17 @@ async function doLookup() {
            ageSec < 86400 ? `${Math.round(ageSec / 3600)} h ago` :
            `${Math.round(ageSec / 86400)} d ago`)
         : "just now";
+      const sourceLabel = ({
+        "web_profile_info": "primary endpoint",
+        "i_instagram": "mobile API",
+        "html_scrape": "HTML scrape",
+        "og_only": "OG meta tags",
+      })[data._source] || data._source || "";
       const cacheBadge = data.from_cache
         ? `<span class="inline-block px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-[10px] font-semibold uppercase tracking-wider">Cached · ${ageTxt}</span>`
         : (data.merged_posts_from_cache
           ? `<span class="inline-block px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 text-[10px] font-semibold uppercase tracking-wider">Mixed · posts from cache (${ageTxt})</span>`
-          : "");
+          : (sourceLabel ? `<span class="inline-block px-2 py-0.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-200 text-[10px] font-semibold uppercase tracking-wider">via ${sourceLabel}</span>` : ""));
       const banner = document.createElement("div");
       banner.className = "glass-card p-3 bg-amber-500/10 border-amber-400/30 mb-2";
       banner.innerHTML = `
