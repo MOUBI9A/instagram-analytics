@@ -1,0 +1,1830 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pulse · Instagram Analytics</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ec4899'/%3E%3Cstop offset='100%25' stop-color='%23fbbf24'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M16 32h6l4-10 6 20 6-14 4 8h6' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="min-h-screen text-slate-100 antialiased">
+    <!-- CMD+K COMMAND PALETTE -->
+    <div id="cmdk" class="fixed inset-0 z-50 hidden items-start justify-center pt-24 bg-black/70 backdrop-blur-md p-4">
+      <div class="glass-card max-w-xl w-full overflow-hidden">
+        <div class="flex items-center gap-2 p-3 border-b border-white/5">
+          <i data-lucide="search" class="w-4 h-4 text-fuchsia-300"></i>
+          <input id="cmdk-input" type="text" placeholder="Search anything — @user, action, section…" class="flex-1 bg-transparent outline-none text-sm" autocomplete="off" />
+          <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-slate-400">esc</kbd>
+        </div>
+        <div id="cmdk-results" class="max-h-80 overflow-y-auto py-1"></div>
+        <div class="px-3 py-2 border-t border-white/5 text-[10px] text-slate-500 flex justify-between">
+          <span>↑↓ navigate · ↵ select</span>
+          <span>⌘K to toggle</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- WELCOME MODAL (shown on first visit) -->
+    <div id="welcome-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+      <div class="max-w-3xl w-full glass-card p-8 sm:p-10 relative">
+        <button id="welcome-close" class="absolute top-4 right-4 p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition" aria-label="Close">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+        <div class="flex items-center gap-3 mb-1">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-fuchsia-500 via-pink-500 to-amber-400 flex items-center justify-center shadow-lg shadow-pink-500/30">
+            <i data-lucide="activity" class="w-6 h-6 text-white"></i>
+          </div>
+          <h1 class="font-display text-3xl font-bold tracking-tight">Pulse</h1>
+        </div>
+        <p class="text-sm text-slate-400 mb-6">The Instagram analytics dashboard that doesn't ask for your password, your email, or a subscription. Runs entirely on your Mac.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="w-9 h-9 rounded-lg bg-fuchsia-500/15 flex items-center justify-center mb-2"><i data-lucide="search" class="w-4 h-4 text-fuchsia-300"></i></div>
+            <div class="font-display font-semibold text-sm">Look up anyone</div>
+            <p class="text-xs text-slate-400 mt-1">Any public IG — instant profile, engagement, top posts, hashtags, brand partnerships.</p>
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="w-9 h-9 rounded-lg bg-amber-400/15 flex items-center justify-center mb-2"><i data-lucide="trending-up" class="w-4 h-4 text-amber-300"></i></div>
+            <div class="font-display font-semibold text-sm">Track over time</div>
+            <p class="text-xs text-slate-400 mt-1">Watchlist with growth charts, delta alerts, manual Insights logging.</p>
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="w-9 h-9 rounded-lg bg-sky-400/15 flex items-center justify-center mb-2"><i data-lucide="sparkles" class="w-4 h-4 text-sky-300"></i></div>
+            <div class="font-display font-semibold text-sm">AI strategist</div>
+            <p class="text-xs text-slate-400 mt-1">Connect a free Gemini key — get tailored growth strategy, reel scripts, brand pitches.</p>
+          </div>
+        </div>
+
+        <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Try it instantly:</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          <button data-demo="cristiano" class="welcome-demo-btn rounded-xl bg-black/40 hover:bg-fuchsia-500/15 border border-white/10 hover:border-fuchsia-400/40 p-3 text-left transition">
+            <div class="text-xs text-slate-400">@cristiano</div>
+            <div class="text-sm font-semibold">664M followers</div>
+          </button>
+          <button data-demo="kyliejenner" class="welcome-demo-btn rounded-xl bg-black/40 hover:bg-fuchsia-500/15 border border-white/10 hover:border-fuchsia-400/40 p-3 text-left transition">
+            <div class="text-xs text-slate-400">@kyliejenner</div>
+            <div class="text-sm font-semibold">Beauty mogul</div>
+          </button>
+          <button data-demo="leomessi" class="welcome-demo-btn rounded-xl bg-black/40 hover:bg-fuchsia-500/15 border border-white/10 hover:border-fuchsia-400/40 p-3 text-left transition">
+            <div class="text-xs text-slate-400">@leomessi</div>
+            <div class="text-sm font-semibold">GOAT</div>
+          </button>
+          <button data-demo="mrbeast" class="welcome-demo-btn rounded-xl bg-black/40 hover:bg-fuchsia-500/15 border border-white/10 hover:border-fuchsia-400/40 p-3 text-left transition">
+            <div class="text-xs text-slate-400">@mrbeast</div>
+            <div class="text-sm font-semibold">Creator economy</div>
+          </button>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">@</span>
+            <input id="welcome-input" type="text" placeholder="or look up any username…" class="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition" />
+          </div>
+          <button id="welcome-go" class="px-5 py-2.5 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow-lg shadow-pink-500/20 transition">Look up →</button>
+        </div>
+
+        <div class="flex items-center justify-between mt-6 pt-5 border-t border-white/5 text-xs text-slate-500">
+          <span><i data-lucide="lock" class="w-3 h-3 inline -mt-0.5"></i> 100% local · no signup · zero tracking</span>
+          <button id="welcome-skip" class="hover:text-fuchsia-300 transition">Skip intro →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- THEME DRAWER -->
+    <div id="theme-drawer" class="fixed top-16 right-4 z-40 hidden glass-card p-4 w-64 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs uppercase tracking-wider text-slate-400">Accent color</span>
+        <button id="theme-drawer-close" class="text-slate-400 hover:text-white text-xs">×</button>
+      </div>
+      <div class="grid grid-cols-5 gap-2" id="theme-swatches"></div>
+      <p class="text-[10px] text-slate-500 mt-3">Saved to your browser. Reset by reloading.</p>
+    </div>
+
+    <!-- AI HISTORY DRAWER -->
+    <div id="ai-history-drawer" class="fixed top-16 right-4 z-40 hidden glass-card p-4 w-80 max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <span class="font-display font-semibold text-sm flex items-center gap-1.5"><i data-lucide="history" class="w-4 h-4"></i>AI history</span>
+        <div class="flex gap-2">
+          <button id="ai-history-clear" class="text-[11px] text-rose-300 hover:text-rose-200" title="Clear all history">Clear</button>
+          <button id="ai-history-close" class="text-slate-400 hover:text-white text-sm">×</button>
+        </div>
+      </div>
+      <div id="ai-history-list" class="space-y-2 overflow-y-auto pr-1"></div>
+    </div>
+
+    <!-- animated gradient backdrop -->
+    <div class="fixed inset-0 -z-10 overflow-hidden">
+      <div class="absolute inset-0 bg-[#070712]"></div>
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+      <div class="absolute inset-0 grid-overlay"></div>
+    </div>
+
+    <!-- header -->
+    <header class="sticky top-0 z-30 backdrop-blur-xl bg-black/30 border-b border-white/5">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="relative">
+            <div
+              class="w-10 h-10 rounded-xl bg-gradient-to-tr from-fuchsia-500 via-pink-500 to-amber-400 flex items-center justify-center shadow-lg shadow-pink-500/30"
+            >
+              <i data-lucide="instagram" class="w-5 h-5 text-white"></i>
+            </div>
+            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#070712]"></span>
+          </div>
+          <div>
+            <h1 class="font-display text-lg font-bold tracking-tight">Pulse <span class="text-slate-500 font-medium text-xs">· IG analytics</span></h1>
+            <p class="text-xs text-slate-400 -mt-0.5">Free, local, no signup.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="theme-btn" class="hidden sm:inline-flex p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition" title="Theme">
+            <i data-lucide="palette" class="w-4 h-4"></i>
+          </button>
+          <button id="ai-history-btn" class="hidden sm:inline-flex p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition relative" title="AI history">
+            <i data-lucide="history" class="w-4 h-4"></i>
+            <span id="ai-history-pill" class="hidden absolute -top-1 -right-1 text-[9px] px-1 rounded-full bg-fuchsia-500 text-white">0</span>
+          </button>
+          <button id="export-pdf-btn" class="hidden sm:inline-flex p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition" title="Export dashboard as PDF / print">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+          </button>
+          <span
+            id="connection-pill"
+            class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 border border-white/10"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+            <span>No data loaded</span>
+          </span>
+          <button
+            id="reset-btn"
+            class="hidden p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition"
+            title="Load a different export"
+          >
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+      <!-- mode tabs -->
+      <div id="mode-tabs" class="flex items-center gap-2 mb-6 flex-wrap">
+        <button
+          data-mode="lookup"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-tr from-fuchsia-500 to-pink-500 text-white shadow-lg shadow-pink-500/20"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="search" class="w-4 h-4"></i>Lookup</span>
+        </button>
+        <button
+          data-mode="watchlist"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition relative"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="bookmark" class="w-4 h-4"></i>Watchlist <span id="watchlist-count" class="hidden ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/30 text-fuchsia-200">0</span></span>
+        </button>
+        <button
+          data-mode="compare"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="git-compare" class="w-4 h-4"></i>Compare</span>
+        </button>
+        <button
+          data-mode="concepts"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="lightbulb" class="w-4 h-4"></i>Concept Studio <span id="concepts-count" class="hidden ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/30 text-fuchsia-200">0</span></span>
+        </button>
+        <button
+          data-mode="export"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="archive" class="w-4 h-4"></i>Data export</span>
+        </button>
+        <button
+          data-mode="live"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4"></i>Live API</span>
+        </button>
+      </div>
+
+      <!-- WATCHLIST panel -->
+      <section id="watchlist-panel" class="mb-8 hidden">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+            <div class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center">
+              <i data-lucide="bookmark" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Watchlist</h2>
+              <p class="text-sm text-slate-400">Track accounts over time. Every refresh adds a snapshot — watch followers, engagement & posts evolve.</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                id="watchlist-refresh-btn"
+                class="px-4 py-2 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow-lg shadow-pink-500/20 transition inline-flex items-center gap-1.5"
+              >
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Refresh all
+              </button>
+              <button
+                id="watchlist-export-btn"
+                class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition inline-flex items-center gap-1.5"
+                title="Export CSV"
+              >
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>CSV
+              </button>
+            </div>
+          </div>
+
+          <!-- add new -->
+          <div class="flex gap-2 mb-4">
+            <div class="flex-1 relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span>
+              <input
+                id="watchlist-add-input"
+                type="text"
+                placeholder="username to track…"
+                class="w-full bg-black/40 border border-white/10 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition"
+              />
+            </div>
+            <button
+              id="watchlist-add-btn"
+              class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition inline-flex items-center gap-1.5"
+            >
+              <i data-lucide="plus" class="w-4 h-4"></i>Add
+            </button>
+          </div>
+
+          <div id="watchlist-status" class="hidden mb-3 text-xs text-slate-400"></div>
+
+          <!-- list -->
+          <div id="watchlist-empty" class="text-center py-10 text-slate-500 text-sm">
+            <i data-lucide="bookmark" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+            <p>Nothing tracked yet.</p>
+            <p class="text-xs mt-1">Look up any account and click <strong>Add to watchlist</strong>, or type one above.</p>
+          </div>
+          <div id="watchlist-list" class="space-y-2"></div>
+
+          <!-- expanded detail (single account chart) -->
+          <div id="watchlist-detail" class="hidden mt-6 pt-6 border-t border-white/5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-display text-base font-semibold"><span id="detail-username"></span> — growth history</h3>
+              <div class="flex items-center gap-2">
+                <button id="detail-log-btn" class="text-xs px-2.5 py-1 rounded-md bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 transition inline-flex items-center gap-1">
+                  <i data-lucide="plus" class="w-3 h-3"></i>Log Insights manually
+                </button>
+                <button id="detail-close" class="text-xs text-slate-400 hover:text-fuchsia-300">Close</button>
+              </div>
+            </div>
+
+            <!-- manual log form -->
+            <div id="detail-log-form" class="hidden mb-4 p-4 rounded-xl bg-black/40 border border-fuchsia-400/20">
+              <p class="text-xs text-slate-400 mb-3">
+                Open Instagram → your profile → <strong>Insights</strong> (or tap a post → "View insights"). Type what you see — the dashboard plots everything over time.
+              </p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Date</label>
+                  <input id="log-date" type="date" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Reach (last 7d)</label>
+                  <input id="log-reach" type="number" min="0" placeholder="e.g. 12500" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Impressions (7d)</label>
+                  <input id="log-impressions" type="number" min="0" placeholder="e.g. 45000" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Profile views (7d)</label>
+                  <input id="log-views" type="number" min="0" placeholder="e.g. 350" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Followers</label>
+                  <input id="log-followers" type="number" min="0" placeholder="overrides public count" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Website clicks (7d)</label>
+                  <input id="log-clicks" type="number" min="0" placeholder="optional" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Notes</label>
+                  <input id="log-notes" type="text" placeholder="e.g. posted a reel about X" class="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60" />
+                </div>
+              </div>
+              <div class="flex gap-2 mt-3">
+                <button id="log-save-btn" class="px-4 py-1.5 rounded-md bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow shadow-pink-500/20 transition">Save entry</button>
+                <button id="log-cancel-btn" class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Cancel</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div class="rounded-xl bg-black/30 border border-white/5 p-4 h-64"><canvas id="detail-followers-chart"></canvas></div>
+              <div class="rounded-xl bg-black/30 border border-white/5 p-4 h-64"><canvas id="detail-engagement-chart"></canvas></div>
+              <div class="rounded-xl bg-black/30 border border-white/5 p-4 h-64 lookup-only"><canvas id="detail-reach-chart"></canvas></div>
+              <div class="rounded-xl bg-black/30 border border-white/5 p-4 h-64 lookup-only"><canvas id="detail-views-chart"></canvas></div>
+            </div>
+
+            <div class="mt-4">
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Logged entries</h4>
+              <div id="detail-entries" class="space-y-1 max-h-48 overflow-y-auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMPARE panel -->
+      <section id="compare-panel" class="mb-8 hidden">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center">
+              <i data-lucide="git-compare" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Compare accounts</h2>
+              <p class="text-sm text-slate-400">Side-by-side breakdown of up to 5 accounts.</p>
+              <div class="flex flex-wrap gap-2 mt-4 items-center">
+                <div id="compare-chips" class="flex flex-wrap gap-1.5"></div>
+                <div class="flex gap-1.5">
+                  <div class="relative">
+                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span>
+                    <input id="compare-input" type="text" placeholder="add account" class="w-40 bg-black/40 border border-white/10 rounded-lg pl-6 pr-2 py-1.5 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition" />
+                  </div>
+                  <button id="compare-add-btn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition">Add</button>
+                </div>
+              </div>
+              <div id="compare-error" class="hidden mt-3 text-xs text-rose-300"></div>
+            </div>
+          </div>
+
+          <div id="compare-empty" class="text-center py-10 text-slate-500 text-sm">
+            <i data-lucide="git-compare" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+            <p>Add 2–5 accounts to compare.</p>
+          </div>
+
+          <div id="compare-results" class="hidden mt-6 space-y-6">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead id="compare-thead"></thead>
+                <tbody id="compare-tbody"></tbody>
+              </table>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="rounded-xl bg-black/30 border border-white/5 p-4 h-72"><canvas id="compare-bar-chart"></canvas></div>
+              <div class="rounded-xl bg-black/30 border border-white/5 p-4 h-72"><canvas id="compare-radar-chart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONCEPT STUDIO panel -->
+      <section id="concepts-panel" class="mb-8 hidden">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center">
+              <i data-lucide="lightbulb" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Concept Studio <span class="ml-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-200 align-middle">For creators & influencers</span></h2>
+              <p class="text-sm text-slate-400 mt-1.5 max-w-2xl">
+                Pick the accounts you want to create like — yours, a competitor, or a creator you admire. The engine analyzes
+                their <span class="text-slate-200">followers, top hooks, hashtags, viral patterns, and posting cadence</span>,
+                then proposes <span class="text-fuchsia-300">concrete content concepts</span> with realistic view-range estimates and a confidence score.
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300"><i data-lucide="dna" class="w-3 h-3 text-fuchsia-300"></i>Viral DNA extraction</span>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300"><i data-lucide="zap" class="w-3 h-3 text-amber-300"></i>Top-hook mining</span>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300"><i data-lucide="target" class="w-3 h-3 text-emerald-300"></i>Matched actions</span>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300"><i data-lucide="database" class="w-3 h-3 text-sky-300"></i>Saved-to-disk · works offline</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- account selector -->
+          <div class="mt-6">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400">Select accounts</h3>
+              <div class="flex items-center gap-2 text-xs">
+                <button id="concepts-select-all" class="text-slate-400 hover:text-fuchsia-300 transition">Select all</button>
+                <span class="text-slate-600">·</span>
+                <button id="concepts-clear" class="text-slate-400 hover:text-fuchsia-300 transition">Clear</button>
+              </div>
+            </div>
+
+            <div id="concepts-empty-history" class="hidden text-center py-10 text-slate-500 text-sm">
+              <i data-lucide="search" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+              <p>No accounts yet. <button id="concepts-go-lookup" class="text-fuchsia-300 hover:underline">Look one up</button> first — every account you fetch shows up here.</p>
+            </div>
+
+            <div id="concepts-account-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5"></div>
+          </div>
+
+          <!-- filters -->
+          <div id="concepts-filters" class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Formats</label>
+              <div class="flex flex-wrap gap-1.5" data-concepts-filter="format">
+                <button data-val="reel" class="concept-filter-btn active">Reel</button>
+                <button data-val="carousel" class="concept-filter-btn active">Carousel</button>
+                <button data-val="photo" class="concept-filter-btn active">Photo</button>
+                <button data-val="story" class="concept-filter-btn">Story</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Tone</label>
+              <div class="flex flex-wrap gap-1.5" data-concepts-filter="tone">
+                <button data-val="educational" class="concept-filter-btn active">Educational</button>
+                <button data-val="entertaining" class="concept-filter-btn active">Entertaining</button>
+                <button data-val="inspiring" class="concept-filter-btn">Inspiring</button>
+                <button data-val="promotional" class="concept-filter-btn">Promotional</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Ambition</label>
+              <div class="flex flex-wrap gap-1.5" data-concepts-filter="ambition">
+                <button data-val="safe" class="concept-filter-btn active" title="Concepts close to what works now">Safe</button>
+                <button data-val="growth" class="concept-filter-btn active" title="Stretch concepts that target reach">Growth</button>
+                <button data-val="viral" class="concept-filter-btn" title="Risky, high-ceiling concepts">Viral</button>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
+            <span class="text-slate-500">Min estimated views:</span>
+            <div class="flex flex-wrap gap-1.5" data-concepts-filter="minViews">
+              <button data-val="0" class="concept-filter-btn active">Any</button>
+              <button data-val="1000" class="concept-filter-btn">1K+</button>
+              <button data-val="10000" class="concept-filter-btn">10K+</button>
+              <button data-val="100000" class="concept-filter-btn">100K+</button>
+            </div>
+            <span class="text-slate-600">·</span>
+            <span class="text-slate-500">Account tier:</span>
+            <div class="flex flex-wrap gap-1.5" data-concepts-filter="tier">
+              <button data-val="all" class="concept-filter-btn active">All</button>
+              <button data-val="nano" class="concept-filter-btn" title="< 10K followers">Nano</button>
+              <button data-val="micro" class="concept-filter-btn" title="10K–100K">Micro</button>
+              <button data-val="mid" class="concept-filter-btn" title="100K–1M">Mid</button>
+              <button data-val="macro" class="concept-filter-btn" title="1M+">Macro</button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 mt-5">
+            <button
+              id="concepts-generate-btn"
+              class="px-5 py-2.5 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow-lg shadow-pink-500/20 transition inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>Generate concepts
+            </button>
+            <span id="concepts-selected-count" class="text-xs text-slate-400">Select 1+ accounts to start</span>
+            <div class="flex-1"></div>
+            <button id="concepts-export-btn" class="hidden px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy all
+            </button>
+          </div>
+
+          <!-- analytics summary (shown after generation) -->
+          <div id="concepts-summary" class="hidden mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rounded-xl bg-black/30 border border-white/5 p-3">
+              <p class="text-[10px] uppercase tracking-wider text-slate-400">Combined reach pool</p>
+              <p class="font-display text-lg mt-1" id="concepts-sum-followers">—</p>
+            </div>
+            <div class="rounded-xl bg-black/30 border border-white/5 p-3">
+              <p class="text-[10px] uppercase tracking-wider text-slate-400">Median engagement</p>
+              <p class="font-display text-lg mt-1" id="concepts-sum-er">—</p>
+            </div>
+            <div class="rounded-xl bg-black/30 border border-white/5 p-3">
+              <p class="text-[10px] uppercase tracking-wider text-slate-400">Strongest format</p>
+              <p class="font-display text-lg mt-1" id="concepts-sum-format">—</p>
+            </div>
+            <div class="rounded-xl bg-black/30 border border-white/5 p-3">
+              <p class="text-[10px] uppercase tracking-wider text-slate-400">Top theme</p>
+              <p class="font-display text-lg mt-1" id="concepts-sum-theme">—</p>
+            </div>
+          </div>
+
+          <!-- VIRAL DNA panel -->
+          <div id="concepts-viral-dna" class="hidden mt-6 rounded-2xl bg-gradient-to-br from-fuchsia-500/8 to-purple-500/5 border border-fuchsia-400/15 p-5">
+            <div class="flex items-center gap-2 mb-4">
+              <i data-lucide="dna" class="w-4 h-4 text-fuchsia-300"></i>
+              <h3 class="font-display text-sm font-semibold tracking-wide uppercase text-fuchsia-200">Viral DNA · what actually works for these accounts</h3>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Top hooks (from highest-engagement posts)</p>
+                <ul id="dna-hooks" class="space-y-1.5 text-xs text-slate-300"></ul>
+              </div>
+              <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Viral signal patterns</p>
+                <ul id="dna-patterns" class="space-y-1.5 text-xs text-slate-300"></ul>
+              </div>
+              <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Matched actions you can do this week</p>
+                <ul id="dna-actions" class="space-y-1.5 text-xs text-slate-300"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- concept cards -->
+          <div class="mt-6 flex items-center justify-between">
+            <h3 id="concepts-results-title" class="hidden text-xs uppercase tracking-wider text-slate-400">Concept ideas</h3>
+            <div id="concepts-group-toggle" class="hidden flex items-center gap-2 text-xs">
+              <span class="text-slate-500">Group by:</span>
+              <button data-group="none" class="concept-filter-btn active">None</button>
+              <button data-group="format" class="concept-filter-btn">Format</button>
+              <button data-group="ambition" class="concept-filter-btn">Ambition</button>
+            </div>
+          </div>
+          <div id="concepts-results" class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        </div>
+      </section>
+
+      <!-- LOOKUP panel -->
+      <section id="lookup-panel" class="mb-8">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex flex-col sm:flex-row sm:items-start gap-6">
+            <div
+              class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center"
+            >
+              <i data-lucide="search" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Look up any public account</h2>
+              <p class="text-sm text-slate-400 mt-1">
+                Type a username — get profile pic, name, follower count, following count, and post count. Works on any public
+                account without logging in. Fetched via local proxy on this machine.
+              </p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-5">
+                <div class="sm:col-span-3 relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">@</span>
+                  <input
+                    id="lookup-input"
+                    type="text"
+                    placeholder="cristiano"
+                    autocomplete="off"
+                    class="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition"
+                  />
+                </div>
+                <button
+                  id="lookup-btn"
+                  class="px-5 py-2.5 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow-lg shadow-pink-500/20 transition"
+                >
+                  Look up
+                </button>
+              </div>
+
+              <p class="text-xs text-slate-500 mt-3">
+                <i data-lucide="info" class="w-3 h-3 inline -mt-0.5"></i>
+                Only public counts &amp; profile pic are available without login — no follower lists, no insights. For those use the other tabs.
+              </p>
+
+              <div id="lookup-error" class="hidden mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-300">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                  <div id="lookup-error-msg"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- live (FB Login) panel -->
+      <section id="live-panel" class="mb-8">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex flex-col sm:flex-row sm:items-start gap-6">
+            <div
+              class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center"
+            >
+              <i data-lucide="key-round" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Connect with Facebook · Live API</h2>
+              <p class="text-sm text-slate-400 mt-1">
+                Pull live numbers from the Instagram Graph API for an account you manage — no rate-limits.
+                One-time setup. The wizard below walks you through it.
+              </p>
+
+              <!-- ===== Meta Connect Wizard ===== -->
+              <div id="meta-wizard" class="mt-5 space-y-3">
+
+                <!-- Step 1: HTTPS tunnel -->
+                <div class="wizard-step" data-step="1">
+                  <div class="wizard-step-head">
+                    <span class="wizard-step-num">1</span>
+                    <div class="flex-1">
+                      <div class="wizard-step-title">Start an HTTPS tunnel</div>
+                      <div class="wizard-step-sub">Meta only accepts <code>https://</code> redirect URIs. We'll create one with Cloudflare — free, no signup.</div>
+                    </div>
+                    <span id="wizard-tunnel-status" class="wizard-pill wizard-pill-idle">Not started</span>
+                  </div>
+                  <div class="wizard-step-body">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button id="wizard-tunnel-start" class="px-4 py-2 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold inline-flex items-center gap-2 transition">
+                        <i data-lucide="zap" class="w-4 h-4"></i>Start HTTPS tunnel
+                      </button>
+                      <button id="wizard-tunnel-stop" class="hidden px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+                        <i data-lucide="square" class="w-3.5 h-3.5"></i>Stop
+                      </button>
+                      <span id="wizard-tunnel-uptime" class="hidden text-[11px] text-slate-500"></span>
+                    </div>
+                    <div id="wizard-tunnel-result" class="hidden mt-3">
+                      <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Your HTTPS URL</label>
+                      <div class="flex gap-2">
+                        <input id="wizard-tunnel-url" readonly class="flex-1 bg-black/50 border border-fuchsia-400/30 rounded-md px-3 py-2 text-sm font-mono text-fuchsia-200" />
+                        <button id="wizard-tunnel-copy" class="px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+                          <i data-lucide="copy" class="w-3.5 h-3.5"></i>Copy
+                        </button>
+                        <a id="wizard-tunnel-open" href="#" target="_blank" rel="noreferrer" class="px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+                          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>Open
+                        </a>
+                      </div>
+                      <p class="text-[11px] text-slate-500 mt-1.5">Keep this terminal open while you connect — closing it kills the tunnel.</p>
+                    </div>
+                    <div id="wizard-tunnel-error" class="hidden mt-2 text-xs text-rose-300"></div>
+                  </div>
+                </div>
+
+                <!-- Step 2: Meta App settings -->
+                <div class="wizard-step" data-step="2">
+                  <div class="wizard-step-head">
+                    <span class="wizard-step-num">2</span>
+                    <div class="flex-1">
+                      <div class="wizard-step-title">Configure your Meta app</div>
+                      <div class="wizard-step-sub">Paste the URLs below into your app's settings.</div>
+                    </div>
+                    <span id="wizard-meta-status" class="wizard-pill wizard-pill-idle">Pending</span>
+                  </div>
+                  <div class="wizard-step-body">
+                    <p class="text-xs text-slate-400 mb-3">
+                      Don't have a Meta app yet?
+                      <a href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer" class="text-fuchsia-300 hover:underline">
+                        Create one →
+                      </a>
+                      Choose <strong>Business</strong> type. Add the <strong>Facebook Login for Business</strong> product
+                      <strong>and</strong> the <strong>Instagram</strong> product (the new one — not "Instagram Graph API").
+                    </p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div class="wizard-paste-card">
+                        <div class="wizard-paste-label">App Settings → Basic → <em>App Domains</em></div>
+                        <div class="wizard-paste-row">
+                          <code id="wizard-paste-domain" class="flex-1">—</code>
+                          <button data-copy="wizard-paste-domain" class="wizard-paste-copy"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                        </div>
+                      </div>
+                      <div class="wizard-paste-card">
+                        <div class="wizard-paste-label">App Settings → Basic → <em>Privacy Policy URL</em></div>
+                        <div class="wizard-paste-row">
+                          <code id="wizard-paste-privacy" class="flex-1">—</code>
+                          <button data-copy="wizard-paste-privacy" class="wizard-paste-copy"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                        </div>
+                      </div>
+                      <div class="wizard-paste-card">
+                        <div class="wizard-paste-label">App Settings → Basic → <em>Terms of Service URL</em></div>
+                        <div class="wizard-paste-row">
+                          <code id="wizard-paste-terms" class="flex-1">—</code>
+                          <button data-copy="wizard-paste-terms" class="wizard-paste-copy"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                        </div>
+                      </div>
+                      <div class="wizard-paste-card">
+                        <div class="wizard-paste-label">Facebook Login → Settings → <em>Valid OAuth Redirect URIs</em></div>
+                        <div class="wizard-paste-row">
+                          <code id="wizard-paste-redirect" class="flex-1">—</code>
+                          <button data-copy="wizard-paste-redirect" class="wizard-paste-copy"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p class="mt-3 text-[11px] text-slate-500">
+                      After saving in the Meta dashboard, your Instagram account must be a <strong>Business or Creator</strong>
+                      account and linked to a <strong>Facebook Page</strong> you administer.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Step 3: App ID + (optional) Config ID -->
+                <div class="wizard-step" data-step="3">
+                  <div class="wizard-step-head">
+                    <span class="wizard-step-num">3</span>
+                    <div class="flex-1">
+                      <div class="wizard-step-title">Paste your Meta App ID</div>
+                      <div class="wizard-step-sub">Found at the top of your Meta App dashboard.</div>
+                    </div>
+                    <span id="wizard-creds-status" class="wizard-pill wizard-pill-idle">Empty</span>
+                  </div>
+                  <div class="wizard-step-body">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1.5">Meta App ID</label>
+                        <input
+                          id="appid-input"
+                          type="text"
+                          placeholder="e.g. 1234567890123456"
+                          autocomplete="off"
+                          class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1.5">
+                          Login Configuration ID
+                          <span class="text-slate-600 normal-case tracking-normal">— only for "Login for Business"</span>
+                        </label>
+                        <input
+                          id="configid-input"
+                          type="text"
+                          placeholder="optional · numeric"
+                          autocomplete="off"
+                          class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition"
+                        />
+                      </div>
+                    </div>
+                    <div class="mt-3">
+                      <button
+                        id="save-appid-btn"
+                        class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition"
+                      >
+                        Save credentials
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Step 4: Connect -->
+                <div class="wizard-step" data-step="4">
+                  <div class="wizard-step-head">
+                    <span class="wizard-step-num">4</span>
+                    <div class="flex-1">
+                      <div class="wizard-step-title">Connect</div>
+                      <div class="wizard-step-sub">Opens the Facebook login popup. Approve the permissions Pulse asks for.</div>
+                    </div>
+                    <span id="wizard-connect-status" class="wizard-pill wizard-pill-idle">Idle</span>
+                  </div>
+                  <div class="wizard-step-body">
+                    <div class="flex flex-wrap items-center gap-3">
+                      <button
+                        id="fb-login-btn"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1877F2] hover:bg-[#1665d4] text-white text-sm font-semibold shadow-lg shadow-[#1877F2]/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                          <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.412c0-3.022 1.792-4.69 4.533-4.69 1.312 0 2.686.236 2.686.236v2.965h-1.514c-1.491 0-1.956.93-1.956 1.886v2.265h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+                        </svg>
+                        Continue with Facebook
+                      </button>
+                      <button
+                        id="fb-logout-btn"
+                        class="hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition"
+                      >
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        Log out
+                      </button>
+                    </div>
+                    <div id="live-error-box" class="hidden mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-300">
+                      <div class="flex items-start gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                        <div class="flex-1">
+                          <div id="live-error-msg"></div>
+                          <div id="live-error-hint" class="mt-1.5 text-rose-200/80 text-xs"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- upload panel (export) -->
+      <section id="upload-panel" class="mb-8 hidden">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex flex-col sm:flex-row sm:items-start gap-6">
+            <div
+              class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center"
+            >
+              <i data-lucide="archive" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Drop your Instagram export</h2>
+              <p class="text-sm text-slate-400 mt-1">
+                Everything runs locally in your browser — your data never leaves this device. Both
+                <strong class="text-fuchsia-300">JSON</strong> and <strong class="text-fuchsia-300">HTML</strong> export formats work.
+                Drop the <code class="text-fuchsia-300 bg-black/40 px-1 rounded">.zip</code> Instagram emailed you.
+              </p>
+
+              <!-- drop zone -->
+              <label
+                id="drop-zone"
+                for="file-input"
+                class="block mt-5 rounded-xl border-2 border-dashed border-white/10 hover:border-fuchsia-400/40 bg-black/20 hover:bg-black/30 transition cursor-pointer"
+              >
+                <input id="file-input" type="file" accept=".zip,application/zip" class="hidden" />
+                <div class="py-10 px-6 flex flex-col items-center text-center">
+                  <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-fuchsia-500/20 to-pink-500/20 border border-white/10 flex items-center justify-center mb-3">
+                    <i data-lucide="upload-cloud" class="w-7 h-7 text-fuchsia-300"></i>
+                  </div>
+                  <p class="font-display font-semibold">
+                    Drop your <span class="text-fuchsia-300">instagram-…zip</span> here
+                  </p>
+                  <p class="text-xs text-slate-400 mt-1">or click to browse · stays on your machine</p>
+                  <p class="text-[10px] text-slate-500 mt-2">small exports only (&lt;500 MB) · for larger files, use the path field below</p>
+                </div>
+              </label>
+
+              <!-- server-side path option (for large exports) -->
+              <div class="mt-3 rounded-lg bg-black/30 border border-white/10 p-3">
+                <p class="text-xs text-slate-400 mb-2">
+                  <strong class="text-fuchsia-300">Large export?</strong> Paste the full path to the zip on your Mac — the local Python server will stream-parse it without browser memory limits.
+                </p>
+                <div class="flex gap-2">
+                  <input
+                    id="export-path-input"
+                    type="text"
+                    placeholder="/Users/you/Downloads/instagram-…zip  (or just Downloads/instagram-…zip)"
+                    class="flex-1 bg-black/40 border border-white/10 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition"
+                  />
+                  <button
+                    id="export-path-btn"
+                    class="px-4 py-2 rounded-md bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-xs font-semibold shadow shadow-pink-500/20 transition"
+                  >
+                    Parse
+                  </button>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-2">
+                  💡 In Finder, right-click the zip → <strong>Hold ⌥ Option</strong> → <strong>Copy &lt;name&gt; as Pathname</strong>, then paste.
+                </p>
+              </div>
+
+              <!-- how to request -->
+              <details class="mt-4 group rounded-lg bg-black/30 border border-white/5">
+                <summary class="cursor-pointer px-3 py-2.5 text-xs text-slate-300 hover:text-fuchsia-300 transition inline-flex items-center gap-1.5 select-none">
+                  <i data-lucide="chevron-right" class="w-3 h-3 group-open:rotate-90 transition-transform"></i>
+                  How to request your Instagram export (2 min, then 1–48h wait)
+                </summary>
+                <ol class="px-4 pb-3 pt-1 text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
+                  <li>In the Instagram app: <strong>Settings</strong> → <strong>Centre de comptes</strong> (Accounts Center).</li>
+                  <li><strong>Vos informations et autorisations</strong> → <strong>Télécharger vos informations</strong>.</li>
+                  <li>Pick your account → <strong>Quelques-unes</strong> de vos informations or <strong>Toutes</strong>.</li>
+                  <li>Format: <strong>JSON</strong> (preferred, smaller) <em>or</em> <strong>HTML</strong> — both work. Quality: any. Date range: <strong>Depuis le début</strong>.</li>
+                  <li>Submit. Instagram emails you a download link within 1–48 hours.</li>
+                  <li>Download the <code class="text-fuchsia-300 bg-black/40 px-1 rounded">.zip</code>, drop it above.</li>
+                </ol>
+              </details>
+
+              <div id="error-box" class="hidden mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-300">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                  <div id="error-msg"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- loading -->
+      <section id="loading-state" class="hidden">
+        <div class="glass-card p-12 flex flex-col items-center text-center">
+          <div class="loader"></div>
+          <p class="mt-4 text-sm text-slate-400" id="loading-text">Reading your export…</p>
+          <p class="mt-1 text-xs text-slate-500" id="loading-sub"></p>
+        </div>
+      </section>
+
+      <!-- dashboard -->
+      <section id="dashboard" class="hidden space-y-6">
+        <!-- merge banner (shown after export, prompts to enrich with live data) -->
+        <div id="merge-banner" class="hidden glass-card p-4 bg-gradient-to-r from-fuchsia-500/10 to-amber-400/10 border-fuchsia-400/30">
+          <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div class="flex items-start gap-3">
+              <i data-lucide="zap" class="w-5 h-5 text-fuchsia-300 mt-0.5 shrink-0"></i>
+              <div>
+                <div class="font-display font-semibold text-sm" id="merge-banner-title">Enrich with live data</div>
+                <p class="text-xs text-slate-400 mt-0.5" id="merge-banner-sub">
+                  Add live engagement, brand detection, reel ideas and similar accounts for <span id="merge-username" class="text-fuchsia-300"></span>
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="merge-btn" class="px-4 py-2 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow shadow-pink-500/20 transition inline-flex items-center gap-1.5">
+                <i data-lucide="merge" class="w-4 h-4"></i>Merge live data
+              </button>
+            </div>
+          </div>
+          <div id="merge-error" class="hidden mt-2 text-xs text-rose-300"></div>
+        </div>
+
+        <!-- ACCOUNT HEALTH SCORE (lookup mode only) -->
+        <div class="lookup-only hidden glass-card p-6 bg-gradient-to-br from-fuchsia-500/5 via-transparent to-amber-400/5">
+          <div class="flex flex-col md:flex-row items-center gap-6">
+            <div class="relative shrink-0">
+              <svg viewBox="0 0 120 120" class="w-32 h-32 -rotate-90">
+                <circle cx="60" cy="60" r="52" stroke="rgba(255,255,255,0.05)" stroke-width="10" fill="none"/>
+                <circle id="health-gauge" cx="60" cy="60" r="52" stroke="url(#health-gradient)" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="326" stroke-dashoffset="326" style="transition:stroke-dashoffset 1.2s ease"/>
+                <defs>
+                  <linearGradient id="health-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#ec4899"/>
+                    <stop offset="100%" stop-color="#fbbf24"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <div id="health-score" class="font-display text-4xl font-bold">—</div>
+                <div id="health-grade" class="text-xs uppercase tracking-wider text-fuchsia-300 font-semibold">—</div>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0 text-center md:text-left">
+              <h3 class="font-display text-xl font-bold">Account health</h3>
+              <p id="health-summary" class="text-sm text-slate-400 mt-1">Run a lookup to compute…</p>
+              <div id="health-subscores" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- action bar (shown for lookup mode) -->
+        <div class="lookup-only hidden flex flex-wrap items-center gap-2 -mb-2">
+          <button id="dashboard-refresh-btn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Refresh
+          </button>
+          <button id="dashboard-watch-btn" class="px-3 py-1.5 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 text-xs font-medium transition inline-flex items-center gap-1.5">
+            <i data-lucide="bookmark" class="w-3.5 h-3.5"></i><span id="dashboard-watch-label">Add to watchlist</span>
+          </button>
+          <button id="dashboard-compare-btn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+            <i data-lucide="git-compare" class="w-3.5 h-3.5"></i>Add to compare
+          </button>
+          <button id="dashboard-copy-btn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition inline-flex items-center gap-1.5">
+            <i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i>Copy summary
+          </button>
+        </div>
+        <!-- profile + headline stats -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="glass-card p-6 lg:col-span-1">
+            <div class="flex items-center gap-4">
+              <div class="relative">
+                <div class="absolute -inset-1 rounded-full bg-gradient-to-tr from-fuchsia-500 via-pink-500 to-amber-400 blur-[2px] opacity-80"></div>
+                <div id="profile-pic-wrap" class="relative w-20 h-20 rounded-full bg-black flex items-center justify-center ring-2 ring-[#070712] overflow-hidden">
+                  <i data-lucide="user" class="w-8 h-8 text-fuchsia-300" id="profile-pic-fallback"></i>
+                  <img id="profile-pic" src="" alt="" class="hidden absolute inset-0 w-full h-full object-cover" />
+                </div>
+                <span id="profile-verified" class="hidden absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-sky-500 ring-2 ring-[#070712] flex items-center justify-center" title="Verified">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                </span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 id="profile-name" class="font-display text-xl font-bold truncate">Your account</h3>
+                <p id="profile-username" class="text-sm text-fuchsia-300 truncate"></p>
+                <p id="profile-category" class="hidden text-[11px] text-slate-400 mt-0.5 truncate"></p>
+              </div>
+            </div>
+            <p id="profile-bio" class="text-xs text-slate-300 mt-3 whitespace-pre-line line-clamp-4"></p>
+            <a id="profile-external" href="#" target="_blank" rel="noreferrer" class="hidden mt-2 text-xs text-fuchsia-300 hover:underline inline-flex items-center gap-1 truncate max-w-full">
+              <i data-lucide="link-2" class="w-3 h-3 shrink-0"></i>
+              <span id="profile-external-label" class="truncate"></span>
+            </a>
+            <div id="profile-badges" class="flex flex-wrap gap-1.5 mt-3"></div>
+            <div class="grid grid-cols-3 gap-2 mt-6">
+              <div class="text-center py-3 rounded-xl bg-white/5">
+                <div id="stat-media" class="font-display text-lg font-bold">0</div>
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">Posts</div>
+              </div>
+              <div class="text-center py-3 rounded-xl bg-white/5">
+                <div id="stat-followers-small" class="font-display text-lg font-bold">0</div>
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">Followers</div>
+              </div>
+              <div class="text-center py-3 rounded-xl bg-white/5">
+                <div id="stat-follows" class="font-display text-lg font-bold">0</div>
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">Following</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2 grid grid-cols-2 gap-4">
+            <!-- LOOKUP-only stats -->
+            <div class="stat-card lookup-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Followers</span>
+                <div class="w-8 h-8 rounded-lg bg-fuchsia-500/15 flex items-center justify-center">
+                  <i data-lucide="users" class="w-4 h-4 text-fuchsia-300"></i>
+                </div>
+              </div>
+              <div id="lookup-stat-followers" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1">Total followers</p>
+            </div>
+            <div class="stat-card lookup-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Following</span>
+                <div class="w-8 h-8 rounded-lg bg-sky-400/15 flex items-center justify-center">
+                  <i data-lucide="user-plus" class="w-4 h-4 text-sky-300"></i>
+                </div>
+              </div>
+              <div id="lookup-stat-following" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1">Accounts they follow</p>
+            </div>
+            <div class="stat-card lookup-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Posts</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-400/15 flex items-center justify-center">
+                  <i data-lucide="image" class="w-4 h-4 text-emerald-300"></i>
+                </div>
+              </div>
+              <div id="lookup-stat-posts" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1" id="lookup-stat-posts-sub">Total posts</p>
+            </div>
+            <div class="stat-card lookup-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Engagement</span>
+                <div class="w-8 h-8 rounded-lg bg-amber-400/15 flex items-center justify-center">
+                  <i data-lucide="heart" class="w-4 h-4 text-amber-300"></i>
+                </div>
+              </div>
+              <div id="lookup-stat-engagement" class="font-display text-3xl font-bold mt-3">0%</div>
+              <p class="text-xs text-slate-500 mt-1">Avg of last 12 posts ÷ followers</p>
+            </div>
+
+            <!-- LIVE-only stat: engagement -->
+            <div class="stat-card live-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Engagement</span>
+                <div class="w-8 h-8 rounded-lg bg-amber-400/15 flex items-center justify-center">
+                  <i data-lucide="heart" class="w-4 h-4 text-amber-300"></i>
+                </div>
+              </div>
+              <div id="stat-engagement" class="font-display text-3xl font-bold mt-3">0%</div>
+              <p class="text-xs text-slate-500 mt-1">Avg per recent post</p>
+            </div>
+            <div class="stat-card live-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Reach (30d)</span>
+                <div class="w-8 h-8 rounded-lg bg-sky-400/15 flex items-center justify-center">
+                  <i data-lucide="eye" class="w-4 h-4 text-sky-300"></i>
+                </div>
+              </div>
+              <div id="stat-reach" class="font-display text-3xl font-bold mt-3">—</div>
+              <p class="text-xs text-slate-500 mt-1">Unique accounts reached</p>
+            </div>
+            <div class="stat-card live-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Profile views (30d)</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-400/15 flex items-center justify-center">
+                  <i data-lucide="user-search" class="w-4 h-4 text-emerald-300"></i>
+                </div>
+              </div>
+              <div id="stat-views" class="font-display text-3xl font-bold mt-3">—</div>
+              <p class="text-xs text-slate-500 mt-1">Times your profile was viewed</p>
+            </div>
+            <div class="stat-card live-only hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Followers</span>
+                <div class="w-8 h-8 rounded-lg bg-fuchsia-500/15 flex items-center justify-center">
+                  <i data-lucide="users" class="w-4 h-4 text-fuchsia-300"></i>
+                </div>
+              </div>
+              <div id="stat-followers-live" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1">Total followers</p>
+            </div>
+
+            <!-- EXPORT-only stats -->
+            <div class="stat-card export-only">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Don't follow back</span>
+                <div class="w-8 h-8 rounded-lg bg-rose-500/15 flex items-center justify-center">
+                  <i data-lucide="user-x" class="w-4 h-4 text-rose-300"></i>
+                </div>
+              </div>
+              <div id="stat-nofollowback" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1">You follow them, they don't follow you</p>
+            </div>
+            <div class="stat-card export-only">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Silent fans</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-400/15 flex items-center justify-center">
+                  <i data-lucide="sparkles" class="w-4 h-4 text-emerald-300"></i>
+                </div>
+              </div>
+              <div id="stat-fans" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1">Follow you, you don't follow them</p>
+            </div>
+            <div class="stat-card export-only">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Mutuals</span>
+                <div class="w-8 h-8 rounded-lg bg-fuchsia-500/15 flex items-center justify-center">
+                  <i data-lucide="users" class="w-4 h-4 text-fuchsia-300"></i>
+                </div>
+              </div>
+              <div id="stat-mutuals" class="font-display text-3xl font-bold mt-3">0</div>
+              <p class="text-xs text-slate-500 mt-1">Both follow each other</p>
+            </div>
+            <div class="stat-card export-only">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-slate-400">Ratio</span>
+                <div class="w-8 h-8 rounded-lg bg-amber-400/15 flex items-center justify-center">
+                  <i data-lucide="scale" class="w-4 h-4 text-amber-300"></i>
+                </div>
+              </div>
+              <div id="stat-ratio" class="font-display text-3xl font-bold mt-3">—</div>
+              <p class="text-xs text-slate-500 mt-1">Followers ÷ following</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPORT charts -->
+        <div class="export-only grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-display text-base font-semibold">Followers gained over time</h3>
+                <p class="text-xs text-slate-400">When each follower started following you</p>
+              </div>
+              <i data-lucide="trending-up" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div class="h-64"><canvas id="follower-growth-chart"></canvas></div>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-display text-base font-semibold">Your posting activity</h3>
+                <p class="text-xs text-slate-400">Posts per month</p>
+              </div>
+              <i data-lucide="calendar" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div class="h-64"><canvas id="posting-activity-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- LIVE / LOOKUP charts -->
+        <div class="live-lookup hidden grid-cols-1 lg:grid-cols-2 gap-6 lg:grid">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-display text-base font-semibold">Engagement per post</h3>
+                <p class="text-xs text-slate-400">Likes &amp; comments across your recent posts</p>
+              </div>
+              <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div class="h-64"><canvas id="engagement-chart"></canvas></div>
+          </div>
+          <div class="glass-card p-6 live-only hidden">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-display text-base font-semibold">Daily reach (30 days)</h3>
+                <p class="text-xs text-slate-400">Unique accounts reached per day</p>
+              </div>
+              <i data-lucide="activity" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div class="h-64"><canvas id="reach-chart"></canvas></div>
+          </div>
+          <!-- LOOKUP-only: posting frequency (replaces reach when present) -->
+          <div class="glass-card p-6 lookup-only hidden">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-display text-base font-semibold">Posting frequency</h3>
+                <p class="text-xs text-slate-400">Days between recent posts</p>
+              </div>
+              <i data-lucide="calendar-clock" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div class="h-64"><canvas id="frequency-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- LIVE/LOOKUP top posts -->
+        <div class="glass-card p-6 live-lookup hidden">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Top performing posts</h3>
+              <p class="text-xs text-slate-400">Sorted by likes + comments</p>
+            </div>
+            <i data-lucide="trophy" class="w-4 h-4 text-slate-500"></i>
+          </div>
+          <div id="top-posts" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"></div>
+        </div>
+
+        <!-- LOOKUP-only: posting heatmap + content type breakdown -->
+        <div class="lookup-only hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Posting heatmap</h3>
+                <p class="text-xs text-slate-400">When (day × hour) the recent posts went up</p>
+              </div>
+              <i data-lucide="calendar-days" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="posting-heatmap" class="overflow-x-auto"></div>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Content type performance</h3>
+                <p class="text-xs text-slate-400">Avg likes + comments by format</p>
+              </div>
+              <i data-lucide="bar-chart-3" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="content-type-breakdown" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: caption length vs engagement + hashtag effectiveness -->
+        <div class="lookup-only hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Caption length vs engagement</h3>
+                <p class="text-xs text-slate-400">Does writing more help this account?</p>
+              </div>
+              <i data-lucide="scatter-chart" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div class="h-64"><canvas id="caption-scatter-chart"></canvas></div>
+            <p id="caption-insight" class="text-xs text-slate-400 mt-2"></p>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Hashtag effectiveness</h3>
+                <p class="text-xs text-slate-400">Avg engagement per hashtag used</p>
+              </div>
+              <i data-lucide="hash" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="hashtag-effectiveness" class="space-y-1 max-h-64 overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: best vs worst comparison + reels analysis -->
+        <div class="lookup-only hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Best vs typical post</h3>
+                <p class="text-xs text-slate-400">Top performer outperformed median by…</p>
+              </div>
+              <i data-lucide="trending-up" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="best-vs-typical" class="space-y-3"></div>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Reels stats</h3>
+                <p class="text-xs text-slate-400">Video view counts where available</p>
+              </div>
+              <i data-lucide="play-circle" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="reels-stats" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: content patterns -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Content patterns & creator profile</h3>
+              <p class="text-xs text-slate-400">What this account makes, how they post, who they tag</p>
+            </div>
+            <i data-lucide="sparkles" class="w-4 h-4 text-slate-500"></i>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="pattern-tiles"></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Detected themes</h4>
+              <div id="pattern-themes" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Frequently tagged accounts</h4>
+              <div id="pattern-mentions" class="flex flex-wrap gap-1.5"></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Hashtag clusters (used together)</h4>
+              <div id="pattern-clusters" class="space-y-1"></div>
+            </div>
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Content ideas they could try</h4>
+              <ul id="pattern-suggestions" class="space-y-1.5 text-sm text-slate-300 list-disc list-inside"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: niche & brand fit -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Niche fit & sponsorship suggestions</h3>
+              <p class="text-xs text-slate-400">Brand categories and products that match this creator's content</p>
+            </div>
+            <i data-lucide="briefcase" class="w-4 h-4 text-slate-500"></i>
+          </div>
+
+          <div class="mb-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs uppercase tracking-wider text-slate-400">Detected niches:</span>
+              <div id="niche-tags" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Confidence based on category, bio keywords, captions and hashtags from the last 12 posts.</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                <i data-lucide="tag" class="w-3 h-3"></i>Brands to approach
+              </h4>
+              <div id="brand-list" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                <i data-lucide="gift" class="w-3 h-3"></i>Product categories to send
+              </h4>
+              <ul id="product-list" class="space-y-1 text-sm text-slate-300 list-disc list-inside"></ul>
+            </div>
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-white/5">
+            <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+              <i data-lucide="mail" class="w-3 h-3"></i>Sample outreach DM
+            </h4>
+            <div id="outreach-template" class="rounded-lg bg-black/40 border border-white/10 p-3 text-xs text-slate-300 leading-relaxed whitespace-pre-line font-mono"></div>
+            <div class="flex gap-2 mt-2">
+              <button id="copy-outreach-btn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition inline-flex items-center gap-1.5">
+                <i data-lucide="clipboard-copy" class="w-3 h-3"></i>Copy DM
+              </button>
+              <select id="outreach-tone" class="px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs">
+                <option value="friendly">Tone: Friendly</option>
+                <option value="professional">Tone: Professional</option>
+                <option value="casual">Tone: Casual</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: sponsorship rate calculator + what-if simulator -->
+        <div class="lookup-only hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Sponsorship Rate Calculator -->
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                  <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-300"></i>Sponsorship rate
+                </h3>
+                <p class="text-xs text-slate-400">What this creator could charge per post (industry formulas)</p>
+              </div>
+            </div>
+            <div id="rate-summary" class="rounded-xl p-4 bg-gradient-to-br from-emerald-500/10 to-fuchsia-500/10 border border-emerald-400/20">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400">Estimated price per post</div>
+              <div id="rate-range" class="font-display text-2xl font-bold mt-1">—</div>
+              <div id="rate-breakdown" class="text-[11px] text-slate-300 mt-2 space-y-1"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-3" id="rate-tiers"></div>
+            <p class="text-[10px] text-slate-500 mt-2">⚠️ Estimates only. Real rates vary by niche, region, brand budget &amp; negotiation.</p>
+          </div>
+
+          <!-- What-If Simulator -->
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                  <i data-lucide="zap" class="w-4 h-4 text-amber-300"></i>What-if growth simulator
+                </h3>
+                <p class="text-xs text-slate-400">Project followers in 90 days under different posting strategies</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mb-3">
+              <div>
+                <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Posts/week</label>
+                <input id="whatif-cadence" type="range" min="1" max="14" value="3" class="w-full" />
+                <div class="text-center text-xs font-semibold text-fuchsia-300" id="whatif-cadence-label">3</div>
+              </div>
+              <div>
+                <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">% Reels</label>
+                <input id="whatif-reels" type="range" min="0" max="100" value="60" class="w-full" />
+                <div class="text-center text-xs font-semibold text-fuchsia-300" id="whatif-reels-label">60%</div>
+              </div>
+              <div>
+                <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Quality boost</label>
+                <input id="whatif-quality" type="range" min="0" max="100" value="20" class="w-full" />
+                <div class="text-center text-xs font-semibold text-fuchsia-300" id="whatif-quality-label">+20%</div>
+              </div>
+            </div>
+            <div class="h-32 mb-2"><canvas id="whatif-chart"></canvas></div>
+            <div id="whatif-projection" class="text-sm text-slate-300"></div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: brand kit auto-extractor -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                <i data-lucide="palette" class="w-4 h-4 text-fuchsia-300"></i>Brand kit
+              </h3>
+              <p class="text-xs text-slate-400">Auto-extracted visual identity from profile pic &amp; recent posts</p>
+            </div>
+            <button id="brandkit-export" class="text-xs px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition inline-flex items-center gap-1">
+              <i data-lucide="download" class="w-3 h-3"></i>Export PNG
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div>
+              <h4 class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Color palette</h4>
+              <div id="brandkit-colors" class="grid grid-cols-5 gap-1.5"></div>
+            </div>
+            <div>
+              <h4 class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Signature emojis</h4>
+              <div id="brandkit-emojis" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <div>
+              <h4 class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Voice &amp; tone</h4>
+              <div id="brandkit-voice" class="text-xs text-slate-300"></div>
+            </div>
+          </div>
+          <div class="mt-4">
+            <h4 class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Recurring phrases</h4>
+            <div id="brandkit-phrases" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: 365-day posting heatmap (year view) -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                <i data-lucide="grid-3x3" class="w-4 h-4 text-fuchsia-300"></i>Activity year-view
+              </h3>
+              <p class="text-xs text-slate-400">GitHub-style grid of posting days over the past 12 months</p>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] text-slate-400">
+              <span>Less</span>
+              <div class="flex gap-0.5">
+                <div class="w-2.5 h-2.5 rounded-sm bg-white/5"></div>
+                <div class="w-2.5 h-2.5 rounded-sm bg-fuchsia-500/30"></div>
+                <div class="w-2.5 h-2.5 rounded-sm bg-fuchsia-500/55"></div>
+                <div class="w-2.5 h-2.5 rounded-sm bg-fuchsia-500/80"></div>
+                <div class="w-2.5 h-2.5 rounded-sm bg-fuchsia-500"></div>
+              </div>
+              <span>More</span>
+            </div>
+          </div>
+          <div id="year-heatmap" class="overflow-x-auto"></div>
+          <div id="year-heatmap-stats" class="text-xs text-slate-400 mt-3 flex flex-wrap gap-4"></div>
+        </div>
+
+        <!-- LOOKUP-only: caption doctor + shadowban sniffer side by side -->
+        <div class="lookup-only hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Caption Doctor -->
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                  <i data-lucide="stethoscope" class="w-4 h-4 text-fuchsia-300"></i>Caption Doctor
+                </h3>
+                <p class="text-xs text-slate-400">Paste a draft caption — get an instant pre-publish score based on what works for <em>this</em> account.</p>
+              </div>
+            </div>
+            <textarea id="caption-doctor-input" rows="4" placeholder="Paste your draft caption here…" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition resize-none"></textarea>
+            <div class="flex gap-2 mt-2">
+              <button id="caption-doctor-analyze" class="px-3 py-1.5 rounded-md bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-xs font-semibold shadow shadow-pink-500/20 transition inline-flex items-center gap-1.5">
+                <i data-lucide="activity" class="w-3 h-3"></i>Analyze
+              </button>
+              <button id="caption-doctor-rewrite" class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition inline-flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3 h-3"></i>AI rewrite (3 variants)
+              </button>
+            </div>
+            <div id="caption-doctor-result" class="hidden mt-3"></div>
+          </div>
+
+          <!-- Shadowban Sniffer -->
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                  <i data-lucide="user-x" class="w-4 h-4 text-rose-300"></i>Shadowban Sniffer
+                </h3>
+                <p class="text-xs text-slate-400">Compares recent post engagement vs baseline — flags suspicious drops.</p>
+              </div>
+            </div>
+            <div id="shadowban-status" class="rounded-xl p-4 bg-black/30 border border-white/5">
+              <p class="text-sm text-slate-400">Analyzing…</p>
+            </div>
+            <div class="h-32 mt-3"><canvas id="shadowban-chart"></canvas></div>
+            <div id="shadowban-recommendations" class="mt-3 space-y-1.5"></div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: content calendar -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                <i data-lucide="calendar-days" class="w-4 h-4 text-fuchsia-300"></i>Content calendar
+              </h3>
+              <p class="text-xs text-slate-400">Schedule reel ideas to specific days. Browser reminds you when it's time to post.</p>
+            </div>
+            <div class="flex gap-2 items-center">
+              <button id="calendar-prev-week" class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs">←</button>
+              <span id="calendar-week-label" class="text-xs text-slate-400"></span>
+              <button id="calendar-next-week" class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs">→</button>
+              <button id="calendar-notify-perm" class="px-2 py-1 rounded bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 text-xs">🔔 Enable reminders</button>
+            </div>
+          </div>
+          <div id="calendar-grid" class="grid grid-cols-7 gap-2 mb-3"></div>
+          <p class="text-xs text-slate-500">💡 Use <strong>Save</strong> on any reel idea card above to send it here.</p>
+        </div>
+
+        <!-- LOOKUP-only: what your audience loves -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">What your audience loves the most ❤️</h3>
+              <p class="text-xs text-slate-400">Patterns from the posts that got the strongest reactions — what to repeat</p>
+            </div>
+            <i data-lucide="flame" class="w-4 h-4 text-slate-500"></i>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="audience-tiles"></div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1"><i data-lucide="trophy" class="w-3 h-3"></i>Top reactions per post</h4>
+              <div id="audience-top-posts" class="space-y-2"></div>
+            </div>
+            <div>
+              <h4 class="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1"><i data-lucide="bar-chart-3" class="w-3 h-3"></i>What works (& what flops)</h4>
+              <div id="audience-insights" class="space-y-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOOKUP-only: brand partnerships detected -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Brand partnerships detected</h3>
+              <p class="text-xs text-slate-400">Companies this account appears to have collaborated with — detected from @mentions in captions and disclosure hashtags</p>
+            </div>
+            <i data-lucide="building-2" class="w-4 h-4 text-slate-500"></i>
+          </div>
+          <div id="brand-partnerships-summary" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+          <div id="brand-partnerships-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+          <details class="mt-4 group">
+            <summary class="cursor-pointer text-xs text-slate-400 hover:text-fuchsia-300 inline-flex items-center gap-1 select-none">
+              <i data-lucide="chevron-right" class="w-3 h-3 group-open:rotate-90 transition-transform"></i>
+              Other @mentions (not in our brand database)
+            </summary>
+            <div id="brand-other-mentions" class="flex flex-wrap gap-1.5 mt-2"></div>
+          </details>
+        </div>
+
+        <!-- LOOKUP-only: reel ideas tailored to this account -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Reel ideas tailored to <span id="reel-ideas-username" class="text-fuchsia-300"></span></h3>
+              <p class="text-xs text-slate-400">12 concepts generated from their niche, top themes, and best-performing formats</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="reel-ideas-refresh" class="text-xs px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition inline-flex items-center gap-1" title="Generate fresh ideas">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate
+              </button>
+              <i data-lucide="film" class="w-4 h-4 text-slate-500"></i>
+            </div>
+          </div>
+          <div id="reel-ideas-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+        </div>
+
+        <!-- LOOKUP-only: caption templates -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Caption templates that work for this account</h3>
+              <p class="text-xs text-slate-400">Patterns extracted from their best-performing posts — copy any to use as a starting point</p>
+            </div>
+            <i data-lucide="pen-tool" class="w-4 h-4 text-slate-500"></i>
+          </div>
+          <div id="caption-templates" class="space-y-2"></div>
+        </div>
+
+        <!-- LOOKUP-only: collab targets -->
+        <div class="lookup-only hidden glass-card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Top collab targets</h3>
+              <p class="text-xs text-slate-400">Best fit for collaborations — merged from Instagram's similar-accounts data and the accounts this creator already @mentions</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="collab-refresh" class="text-xs px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition inline-flex items-center gap-1" title="Refresh from Instagram">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>Refresh
+              </button>
+              <i data-lucide="handshake" class="w-4 h-4 text-slate-500"></i>
+            </div>
+          </div>
+          <div id="collab-targets" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+          <p class="text-[11px] text-slate-500 mt-3"><i data-lucide="info" class="w-3 h-3 inline -mt-0.5"></i> Each row's Lookup button instantly opens that account's full analytics so you can vet fit before reaching out.</p>
+        </div>
+
+        <!-- LOOKUP-only: related profiles + hashtag cloud -->
+        <div class="lookup-only hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Similar accounts</h3>
+                <p class="text-xs text-slate-400">Profiles Instagram suggests as related</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="related-refresh" class="text-xs px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition inline-flex items-center gap-1" title="Re-fetch similar accounts">
+                  <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                </button>
+                <i data-lucide="users-round" class="w-4 h-4 text-slate-500"></i>
+              </div>
+            </div>
+            <div id="related-profiles" class="space-y-1 max-h-80 overflow-y-auto pr-1"></div>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Hashtags in recent posts</h3>
+                <p class="text-xs text-slate-400">From the last 12 captions</p>
+              </div>
+              <i data-lucide="hash" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="lookup-hashtags" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
+        <!-- people lists (EXPORT only) -->
+        <div class="export-only grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">People who don't follow you back</h3>
+                <p class="text-xs text-slate-400">You follow them, they don't follow you</p>
+              </div>
+              <span id="nofollowback-count" class="text-xs text-slate-500"></span>
+            </div>
+            <div id="nofollowback-list" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Silent fans</h3>
+                <p class="text-xs text-slate-400">Follow you, you don't follow them back</p>
+              </div>
+              <span id="fans-count" class="text-xs text-slate-500"></span>
+            </div>
+            <div id="fans-list" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+          </div>
+        </div>
+
+        <!-- recent followers + top engagers (EXPORT only) -->
+        <div class="export-only grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Recent followers</h3>
+                <p class="text-xs text-slate-400">The 20 newest accounts that followed you</p>
+              </div>
+              <i data-lucide="user-plus" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="recent-followers-list" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+          </div>
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-display text-base font-semibold">Your most engaged accounts</h3>
+                <p class="text-xs text-slate-400">Accounts whose posts you liked or commented on the most</p>
+              </div>
+              <i data-lucide="heart" class="w-4 h-4 text-slate-500"></i>
+            </div>
+            <div id="top-engagers-list" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+          </div>
+        </div>
+
+        <!-- posts -->
+        <div class="glass-card p-6">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h3 class="font-display text-base font-semibold">Recent posts</h3>
+              <p class="text-xs text-slate-400"><span id="posts-table-count">0</span> posts · click column headers to sort</p>
+            </div>
+            <div class="flex gap-2 items-center">
+              <div class="relative">
+                <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                <input id="posts-table-search" type="text" placeholder="Search captions…" class="w-48 bg-black/40 border border-white/10 rounded-md pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20" />
+              </div>
+              <select id="posts-table-filter" class="bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-xs">
+                <option value="all">All types</option>
+                <option value="Reel">Reels only</option>
+                <option value="Video">Videos only</option>
+                <option value="Image">Photos only</option>
+                <option value="Carousel">Carousels only</option>
+              </select>
+              <i data-lucide="layout-list" class="w-4 h-4 text-slate-500"></i>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead id="posts-table-head"></thead>
+              <tbody id="posts-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- top hashtags (EXPORT only) -->
+        <div class="glass-card p-6 export-only">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display text-base font-semibold">Hashtags you use most</h3>
+              <p class="text-xs text-slate-400">Top 30 hashtags from your captions</p>
+            </div>
+            <i data-lucide="hash" class="w-4 h-4 text-slate-500"></i>
+          </div>
+          <div id="hashtag-cloud" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- AI Strategy Panel — sends profile context to Anthropic/OpenAI -->
+        <div class="glass-card p-6">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h3 class="font-display text-base font-semibold inline-flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-4 h-4 text-fuchsia-300"></i>
+                AI strategist
+              </h3>
+              <p class="text-xs text-slate-400">Sends a structured snapshot of this account to an LLM, gets back a custom growth, content, and brand strategy.</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <select id="ai-provider" class="px-2 py-1.5 rounded-md bg-black/40 border border-white/10 text-xs">
+                <option value="gemini">Google Gemini — FREE 🎉</option>
+                <option value="groq">Groq (Llama) — FREE 🎉</option>
+                <option value="openai">OpenAI (GPT) — paid</option>
+                <option value="anthropic">Anthropic (Claude) — paid</option>
+              </select>
+              <select id="ai-model" class="px-2 py-1.5 rounded-md bg-black/40 border border-white/10 text-xs">
+                <!-- populated dynamically per provider -->
+              </select>
+              <input
+                id="ai-key"
+                type="password"
+                placeholder="API key (sk-… or sk-ant-…)"
+                class="w-48 bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition font-mono"
+              />
+              <button id="ai-key-save" class="px-2 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Save</button>
+              <button id="ai-discover-models" class="hidden px-2 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition" title="List Gemini models available for this key">🔍 Detect</button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2 mb-3" id="ai-prompts">
+            <button data-prompt="strategy" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 text-xs font-medium transition">Full growth strategy</button>
+            <button data-prompt="content" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">10 reel scripts</button>
+            <button data-prompt="brands" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Brand outreach plan</button>
+            <button data-prompt="audit" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Account audit</button>
+            <button data-prompt="bio" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Rewrite my bio</button>
+            <button data-prompt="roast" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-gradient-to-tr from-rose-500/20 to-orange-400/20 hover:from-rose-500/30 hover:to-orange-400/30 border border-rose-400/40 text-rose-200 text-xs font-medium transition">🔥 Roast my account</button>
+            <button data-prompt="competitor" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Steal from top post</button>
+            <button data-prompt="custom" class="ai-prompt-btn px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition">Custom question…</button>
+          </div>
+
+          <textarea
+            id="ai-custom-prompt"
+            rows="2"
+            placeholder="Ask anything about this account…"
+            class="hidden w-full bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60 focus:ring-2 focus:ring-fuchsia-400/20 transition mb-3"
+          ></textarea>
+
+          <div id="ai-error" class="hidden mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-300"></div>
+
+          <div id="ai-output" class="hidden rounded-xl bg-black/40 border border-white/10 p-4 text-sm leading-relaxed whitespace-pre-wrap"></div>
+
+          <p class="text-[10px] text-slate-500 mt-3">
+            <i data-lucide="lock" class="w-3 h-3 inline -mt-0.5"></i>
+            Key is stored only in your browser's localStorage and sent directly to the provider (via the local proxy to avoid CORS). Nothing is logged.
+            <span id="ai-get-key-hint" class="block mt-1"></span>
+          </p>
+        </div>
+
+        <!-- caveat -->
+        <div class="glass-card p-5 bg-amber-500/5 border-amber-400/20">
+          <div class="flex items-start gap-3">
+            <i data-lucide="info" class="w-4 h-4 text-amber-300 mt-0.5 shrink-0"></i>
+            <p id="caveat-text" class="text-xs text-amber-100/80 leading-relaxed"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="max-w-7xl mx-auto px-6 py-8 text-center text-xs text-slate-500">
+      Reads your Instagram data export · 100% local · No accounts, no servers
+    </footer>
+
+    <div id="fb-root"></div>
+    <script src="app.js"></script>
+    <script>
+      lucide.createIcons();
+    </script>
+  </body>
+</html>
