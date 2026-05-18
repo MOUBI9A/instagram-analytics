@@ -853,6 +853,30 @@
 
       <!-- live (FB Login) panel -->
       <section id="live-panel" class="mb-8">
+        <!-- Verification-pending banner: shown unless dismissed.
+             Change PULSE_LIVE_VERIFICATION_STATUS in app.js to hide once Business Verification completes. -->
+        <div id="live-verification-banner" class="hidden mb-3 glass-card p-4 border-amber-400/30 bg-amber-500/8">
+          <div class="flex items-start gap-3">
+            <i data-lucide="shield-alert" class="w-5 h-5 text-amber-300 shrink-0 mt-0.5"></i>
+            <div class="flex-1 text-sm">
+              <strong class="text-amber-200">Live API · Business Verification pending.</strong>
+              <p class="text-slate-300 mt-1">
+                The Live API requires Meta to verify our business identity before login works for the public.
+                This is in progress. Meanwhile <strong class="text-white">every other tab works fully</strong> —
+                Lookup, Watchlist, Compare, Concept Studio, Discover, and Data Export all use the public lookup
+                pipeline + AI and need no authentication.
+              </p>
+              <p class="text-slate-400 text-xs mt-2">
+                If you're the operator: see
+                <a href="https://github.com/MOUBI9A/instagram-analytics/blob/main/DEPLOY.md#2-meta-app--instagram-live-api" target="_blank" rel="noreferrer" class="text-fuchsia-300 hover:underline">DEPLOY.md → Meta App</a>
+                for the verification path and a test-user workaround.
+              </p>
+            </div>
+            <button id="live-verification-dismiss" class="text-slate-400 hover:text-white text-xs px-2 py-1 shrink-0" title="Dismiss for this session">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
         <div class="glass-card p-6 sm:p-8">
           <div class="flex flex-col sm:flex-row sm:items-start gap-6">
             <div

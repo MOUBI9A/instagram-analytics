@@ -5696,6 +5696,33 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ============================================================
+// LIVE API · verification-pending banner
+// ============================================================
+// Flip this to false (or remove the banner element from index.html) once
+// Meta Business Verification completes and the Live API works publicly.
+const PULSE_LIVE_VERIFICATION_STATUS = "pending"; // "pending" | "verified"
+
+function initLiveVerificationBanner() {
+  const banner = $("live-verification-banner");
+  if (!banner) return;
+  const dismissedThisSession = sessionStorage.getItem("ig_live_banner_dismissed_v1") === "1";
+  if (PULSE_LIVE_VERIFICATION_STATUS === "pending" && !dismissedThisSession) {
+    banner.classList.remove("hidden");
+  } else {
+    banner.classList.add("hidden");
+  }
+  $("live-verification-dismiss")?.addEventListener("click", () => {
+    banner.classList.add("hidden");
+    sessionStorage.setItem("ig_live_banner_dismissed_v1", "1");
+  });
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initLiveVerificationBanner);
+} else {
+  initLiveVerificationBanner();
+}
+
+// ============================================================
 // META CONNECT WIZARD
 // ============================================================
 // Walks the user through: HTTPS tunnel → Meta app config →
