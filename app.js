@@ -5696,6 +5696,301 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ============================================================
+// INSTAGRAM LOGIN (preferred Live API flow)
+// ============================================================
+// Direct Instagram OAuth — bypasses the Facebook Page linkage that the
+// legacy FB Login flow required. The instagram_business_basic scope
+// works WITHOUT Meta Business Verification, so this path unblocks
+// brand-new apps that hit the "verification pending" wall.
+//
+// Flow:
+//   1) Click → redirect to https://www.instagram.com/oauth/authorize
+//   2) User approves → IG redirects back to current origin with ?code=…
+//   3) Page-load detects the code, posts it to /api/instagram/exchange
+//      (server side because client_secret can't be in JS)
+//   4) Server returns long-lived (60-day) access_token
+//   5) Frontend stores token + fetches profile via graph.instagram.com
+// ============================================================
+
+const LS_IG_APP_ID = "ig_direct_app_id_v1";
+const LS_IG_APP_SECRET = "ig_direct_app_secret_v1";
+const LS_IG_TOKEN = "ig_direct_token_v1";
+const LS_IG_USER_ID = "ig_direct_user_id_v1";
+const LS_IG_STATE = "ig_direct_oauth_state_v1";
+
+const IG_GRAPH = "https://graph.instagram.com";
+const IG_OAUTH_URL = "https://www.instagram.com/oauth/authorize";
+// Default scope — instagram_business_basic doesn't require Business Verification
+const IG_SCOPES = "instagram_business_basic,instagram_business_manage_insights";
+
+function igDirectGetConfig() {
+  return {
+    appId: localStorage.getItem(LS_IG_APP_ID) || "",
+    appSecret: localStorage.getItem(LS_IG_APP_SECRET) || "",
+  };
+}
+function igDirectSaveConfig(appId, appSecret) {
+  localStorage.setItem(LS_IG_APP_ID, appId);
+  if (appSecret) localStorage.setItem(LS_IG_APP_SECRET, appSecret);
+  igDirectRefreshConfigStatus();
+}
+function igDirectGetToken() {
+  return {
+    token: localStorage.getItem(LS_IG_TOKEN) || "",
+    userId: localStorage.getItem(LS_IG_USER_ID) || "",
+  };
+}
+function igDirectSaveToken(token, userId) {
+  localStorage.setItem(LS_IG_TOKEN, token);
+  if (userId) localStorage.setItem(LS_IG_USER_ID, String(userId));
+}
+function igDirectClearToken() {
+  localStorage.removeItem(LS_IG_TOKEN);
+  localStorage.removeItem(LS_IG_USER_ID);
+}
+
+function igRedirectUri() {
+  // OAuth redirects strip hash fragments but keep the path — point back at the page root
+  return location.origin + "/";
+}
+
+function igDirectRefreshConfigStatus() {
+  const cfg = igDirectGetConfig();
+  const pill = $("ig-direct-config-status");
+  if (!pill) return;
+  if (cfg.appId && cfg.appSecret) {
+    pill.textContent = "Configured";
+    pill.className = "ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200";
+  } else if (cfg.appId || cfg.appSecret) {
+    pill.textContent = "Incomplete";
+    pill.className = "ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-200";
+  } else {
+    pill.textContent = "Empty";
+    pill.className = "ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-400";
+  }
+  // populate redirect hint
+  const hint = $("ig-direct-redirect-hint");
+  if (hint) hint.innerHTML = `Use this redirect URI in your Meta App: <code class="bg-black/40 px-1 rounded text-fuchsia-200">${igRedirectUri()}</code>`;
+}
+
+function igDirectShowError(msg) {
+  const box = $("ig-direct-error");
+  if (!box) return;
+  box.classList.remove("hidden");
+  box.textContent = msg;
+}
+function igDirectHideError() {
+  $("ig-direct-error")?.classList.add("hidden");
+}
+
+function igDirectUpdateUIForToken() {
+  const { token } = igDirectGetToken();
+  const loginBtn = $("ig-direct-login-btn");
+  const logoutBtn = $("ig-direct-logout-btn");
+  const status = $("ig-direct-status");
+  if (token) {
+    loginBtn?.classList.add("hidden");
+    logoutBtn?.classList.remove("hidden");
+    if (status) status.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-300"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Signed in</span>`;
+  } else {
+    loginBtn?.classList.remove("hidden");
+    logoutBtn?.classList.add("hidden");
+    if (status) status.textContent = "";
+  }
+}
+
+function igStartOAuth() {
+  const cfg = igDirectGetConfig();
+  if (!cfg.appId) {
+    igDirectShowError("Instagram App ID missing. Expand the config section above and paste your Instagram App ID + Secret.");
+    $("ig-direct-config")?.setAttribute("open", "");
+    $("ig-direct-app-id")?.focus();
+    return;
+  }
+  if (!cfg.appSecret) {
+    igDirectShowError("Instagram App Secret missing. Expand the config section above and paste it.");
+    $("ig-direct-config")?.setAttribute("open", "");
+    $("ig-direct-app-secret")?.focus();
+    return;
+  }
+  // CSRF protection
+  const state = (crypto.getRandomValues(new Uint32Array(2)).join("-"));
+  sessionStorage.setItem(LS_IG_STATE, state);
+
+  const params = new URLSearchParams({
+    client_id: cfg.appId,
+    redirect_uri: igRedirectUri(),
+    response_type: "code",
+    scope: IG_SCOPES,
+    state,
+  });
+  location.href = `${IG_OAUTH_URL}?${params.toString()}`;
+}
+
+async function igExchangeCode(code) {
+  const cfg = igDirectGetConfig();
+  const res = await fetch("/api/instagram/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code,
+      client_id: cfg.appId,
+      client_secret: cfg.appSecret,
+      redirect_uri: igRedirectUri(),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function igGraphCall(path, params = {}) {
+  const { token } = igDirectGetToken();
+  if (!token) throw new Error("Not signed in");
+  const url = new URL(`${IG_GRAPH}/v22.0/${path.replace(/^\//, "")}`);
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null) url.searchParams.set(k, v);
+  }
+  url.searchParams.set("access_token", token);
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error?.message || `HTTP ${res.status}`);
+  return data;
+}
+
+async function igLoadDashboardViaDirectToken() {
+  igDirectHideError();
+  showLoading("Fetching your Instagram profile…");
+  try {
+    // /me with the Instagram Login API
+    const profile = await igGraphCall("me", {
+      fields: "id,user_id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,account_type",
+    });
+    showLoading("Fetching recent posts…");
+    let media = [];
+    try {
+      const m = await igGraphCall("me/media", {
+        fields: "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count",
+        limit: 25,
+      });
+      media = m.data || [];
+    } catch (e) {
+      console.warn("media fetch failed:", e.message);
+    }
+    let insights = [];
+    try {
+      const i = await igGraphCall("me/insights", { metric: "reach,profile_views", period: "day" });
+      insights = i.data || [];
+    } catch {}
+    renderLiveDashboard(profile, media, insights);
+    hideLoading();
+    $("dashboard").classList.remove("hidden");
+    setConnected(true, profile.username ? "@" + profile.username : "Instagram");
+    if (window.lucide) window.lucide.createIcons();
+  } catch (e) {
+    hideLoading();
+    igDirectShowError("Couldn't fetch profile: " + e.message);
+    // if token expired/invalid, clear it
+    if (/oauth|token|invalid|expired/i.test(e.message)) {
+      igDirectClearToken();
+      igDirectUpdateUIForToken();
+    }
+  }
+}
+
+async function igHandleOAuthCallback() {
+  const sp = new URLSearchParams(location.search);
+  const code = sp.get("code");
+  const state = sp.get("state");
+  const error = sp.get("error");
+  if (error) {
+    igDirectShowError("Instagram returned an error: " + (sp.get("error_description") || error));
+    history.replaceState(null, "", location.pathname);
+    return;
+  }
+  if (!code) return;
+  const expected = sessionStorage.getItem(LS_IG_STATE);
+  if (state && expected && state !== expected) {
+    igDirectShowError("OAuth state mismatch — possible CSRF. Try signing in again.");
+    history.replaceState(null, "", location.pathname);
+    return;
+  }
+  sessionStorage.removeItem(LS_IG_STATE);
+  // exchange
+  setMode("live");
+  igDirectShowError(""); igDirectHideError();
+  showLoading("Exchanging Instagram code for token…");
+  try {
+    const { access_token, user_id } = await igExchangeCode(code);
+    igDirectSaveToken(access_token, user_id);
+    history.replaceState(null, "", location.pathname);
+    igDirectUpdateUIForToken();
+    await igLoadDashboardViaDirectToken();
+  } catch (e) {
+    hideLoading();
+    igDirectShowError("Token exchange failed: " + e.message);
+    history.replaceState(null, "", location.pathname);
+  }
+}
+
+function initInstagramDirectLogin() {
+  if (!$("ig-direct-login")) return;
+  // hydrate inputs
+  const cfg = igDirectGetConfig();
+  if ($("ig-direct-app-id")) $("ig-direct-app-id").value = cfg.appId;
+  if ($("ig-direct-app-secret")) $("ig-direct-app-secret").value = cfg.appSecret;
+  igDirectRefreshConfigStatus();
+  igDirectUpdateUIForToken();
+
+  $("ig-direct-save")?.addEventListener("click", () => {
+    const id = $("ig-direct-app-id").value.trim();
+    const secret = $("ig-direct-app-secret").value.trim();
+    if (!/^\d{4,}$/.test(id)) {
+      igDirectShowError("App ID should be a numeric string from the Meta App dashboard.");
+      return;
+    }
+    if (!secret || secret.length < 16) {
+      igDirectShowError("App Secret looks too short. It should be a long hex string.");
+      return;
+    }
+    igDirectSaveConfig(id, secret);
+    igDirectHideError();
+    const btn = $("ig-direct-save");
+    const orig = btn.textContent;
+    btn.textContent = "Saved ✓";
+    setTimeout(() => (btn.textContent = orig), 1500);
+  });
+
+  $("ig-direct-login-btn")?.addEventListener("click", () => {
+    igDirectHideError();
+    igStartOAuth();
+  });
+  $("ig-direct-logout-btn")?.addEventListener("click", () => {
+    igDirectClearToken();
+    igDirectUpdateUIForToken();
+    $("dashboard").classList.add("hidden");
+    setConnected(false);
+  });
+
+  // Handle OAuth callback if we're returning from instagram.com
+  if (location.search.includes("code=") || location.search.includes("error=")) {
+    igHandleOAuthCallback();
+  } else {
+    // If a token is already saved, auto-load when the live panel opens
+    const { token } = igDirectGetToken();
+    if (token && currentMode === "live") {
+      // delay so UI is ready
+      setTimeout(() => igLoadDashboardViaDirectToken(), 300);
+    }
+  }
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initInstagramDirectLogin);
+} else {
+  initInstagramDirectLogin();
+}
+
+// ============================================================
 // LIVE API · verification-pending banner
 // ============================================================
 // Flip this to false (or remove the banner element from index.html) once
@@ -7630,11 +7925,51 @@ function renderDiscoverResults(profiles, meta) {
   const wrap = $("discover-results");
   wrap.innerHTML = "";
   if (!profiles.length) {
-    wrap.innerHTML = `<div class="col-span-full text-center py-10 text-slate-500 text-sm">
-      <i data-lucide="search-x" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
-      <p>No accounts matched. Try a different country, niche, or lower the engagement floor.</p>
-      ${meta?.totalLookedUp ? `<p class="mt-1 text-xs text-slate-600">Looked up ${meta.totalLookedUp} candidates · ${meta.unavailable} were unavailable / private / deleted.</p>` : ""}
+    const reasons = [];
+    if (meta?.tierRejected) reasons.push(`<li><strong class="text-amber-200">${meta.tierRejected}</strong> were outside the <code class="bg-black/30 px-1 rounded">${meta.tier}</code> follower tier</li>`);
+    if (meta?.erRejected) reasons.push(`<li><strong class="text-amber-200">${meta.erRejected}</strong> had engagement below <code class="bg-black/30 px-1 rounded">${meta.minEr}%</code></li>`);
+    if (meta?.typeRejected) reasons.push(`<li><strong class="text-amber-200">${meta.typeRejected}</strong> weren't <code class="bg-black/30 px-1 rounded">${meta.acctType}</code> accounts</li>`);
+    if (meta?.privateRejected) reasons.push(`<li><strong class="text-amber-200">${meta.privateRejected}</strong> were private</li>`);
+    if (meta?.unavailable) reasons.push(`<li><strong class="text-amber-200">${meta.unavailable}</strong> were unavailable</li>`);
+
+    wrap.innerHTML = `<div class="col-span-full text-center py-8 text-sm">
+      <i data-lucide="filter-x" class="w-8 h-8 mx-auto mb-2 opacity-40 text-fuchsia-300"></i>
+      <p class="text-slate-300 font-medium">No accounts passed your filters.</p>
+      ${reasons.length ? `<ul class="mt-3 mx-auto text-left inline-block text-xs text-slate-400 space-y-1">${reasons.join("")}</ul>` : ""}
+      <div class="mt-5 flex flex-wrap gap-2 justify-center">
+        <button data-discover-relax="tier" class="px-3 py-1.5 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 text-xs font-medium transition">Set tier to Any</button>
+        <button data-discover-relax="er" class="px-3 py-1.5 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 text-xs font-medium transition">Set engagement to Any</button>
+        <button data-discover-relax="type" class="px-3 py-1.5 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 text-xs font-medium transition">Set type to Any</button>
+        <button data-discover-relax="all" class="px-3 py-1.5 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 text-white text-xs font-semibold transition">Relax all + re-run</button>
+      </div>
+      <p class="text-[11px] text-slate-600 mt-4">Of ${meta?.totalLookedUp || "all"} candidates the AI proposed, all existed on Instagram — but none matched what you asked for.</p>
     </div>`;
+    // wire relax buttons
+    wrap.querySelectorAll("[data-discover-relax]").forEach(b => {
+      b.addEventListener("click", () => {
+        const k = b.dataset.discoverRelax;
+        if (k === "tier" || k === "all") {
+          $("discover-tier").value = "any";
+        }
+        if (k === "er" || k === "all") {
+          discoverState.filters.minEr = 0;
+          document.querySelectorAll("[data-discover-filter='minEr'] .concept-filter-btn").forEach(x =>
+            x.classList.toggle("active", x.dataset.val === "0"));
+        }
+        if (k === "type" || k === "all") {
+          discoverState.filters.acctType = "any";
+          document.querySelectorAll("[data-discover-filter='acctType'] .concept-filter-btn").forEach(x =>
+            x.classList.toggle("active", x.dataset.val === "any"));
+        }
+        if (k === "all") {
+          $("discover-find-btn").click();
+        } else if (discoverState.results.length) {
+          // re-run client-side filter on cached results
+          const filtered = applyDiscoverFilters(discoverState.results);
+          renderDiscoverResults(filtered, { ...meta, tierRejected: 0, erRejected: 0, typeRejected: 0, privateRejected: 0 });
+        }
+      });
+    });
     if (window.lucide) window.lucide.createIcons();
     return;
   }
@@ -7821,17 +8156,32 @@ function initDiscover() {
 
       // apply tier filter (post-lookup since we now know real follower counts)
       const tierRange = TIER_RANGES[tier];
+      let tierRejected = 0, erRejected = 0, typeRejected = 0, privateRejected = 0;
       const tierFiltered = profiles.filter(p => {
         if (!p.available) return false;
         if (!p.followers) return tier === "any";
-        return p.followers >= tierRange[0] && p.followers <= tierRange[1];
+        const inTier = p.followers >= tierRange[0] && p.followers <= tierRange[1];
+        if (!inTier) tierRejected++;
+        return inTier;
+      });
+      const finalFiltered = tierFiltered.filter(p => {
+        if (p.is_private) { privateRejected++; return false; }
+        const er = p.followers && p.posts?.length
+          ? (p.posts.reduce((s, x) => s + (x.likes || 0) + (x.comments || 0), 0) / p.posts.length / p.followers) * 100
+          : 0;
+        if (discoverState.filters.minEr && er < discoverState.filters.minEr) { erRejected++; return false; }
+        const at = discoverState.filters.acctType;
+        if (at === "business" && !p.is_business) { typeRejected++; return false; }
+        if (at === "creator" && !p.is_professional && !p.is_business) { typeRejected++; return false; }
+        if (at === "verified" && !p.is_verified) { typeRejected++; return false; }
+        return true;
       });
 
       discoverState.results = tierFiltered;
-      const filtered = applyDiscoverFilters(tierFiltered);
       const unavailable = profiles.filter(p => !p.available).length;
-      renderDiscoverResults(filtered, { totalLookedUp: profiles.length, unavailable });
-      progress.textContent = `Found ${filtered.length} matches · verified ${profiles.length} · ${unavailable} unavailable`;
+      renderDiscoverResults(finalFiltered, { totalLookedUp: profiles.length, unavailable, tierRejected, erRejected, typeRejected, privateRejected, tier, minEr: discoverState.filters.minEr, acctType: discoverState.filters.acctType });
+      progress.textContent = `Found ${finalFiltered.length} matches · verified ${profiles.length}${unavailable ? ` · ${unavailable} unavailable` : ""}${tierRejected ? ` · ${tierRejected} wrong tier` : ""}${erRejected ? ` · ${erRejected} low ER` : ""}${typeRejected ? ` · ${typeRejected} wrong type` : ""}`;
+      const filtered = finalFiltered;
       // reveal save + bulk-concepts buttons now that we have results
       if (filtered.length) {
         $("discover-save-btn").classList.remove("hidden");

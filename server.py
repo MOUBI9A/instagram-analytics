@@ -351,7 +351,64 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(TUNNEL.start(), 200)
         if p.path == "/api/tunnel/stop":
             return self.send_json(TUNNEL.stop(), 200)
+        if p.path == "/api/instagram/exchange":
+            return self.handle_instagram_exchange()
         self.send_error(404, "Not found")
+
+    def handle_instagram_exchange(self):
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(length).decode("utf-8")
+            req = json.loads(body or "{}")
+            code = req.get("code", "")
+            client_id = req.get("client_id", "")
+            client_secret = req.get("client_secret", "")
+            redirect_uri = req.get("redirect_uri", "")
+            if not (code and client_id and client_secret and redirect_uri):
+                return self.send_json({"error": "missing code, client_id, client_secret, or redirect_uri"}, 400)
+
+            form = urllib.parse.urlencode({
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri,
+                "code": code,
+            }).encode()
+            req1 = urllib.request.Request(
+                "https://api.instagram.com/oauth/access_token",
+                data=form,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req1, timeout=20) as resp:
+                    short = json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                return self.send_json({"error": f"short-token exchange failed: {e.read().decode('utf-8', errors='replace')}"}, 502)
+
+            access_token = short.get("access_token")
+            user_id = short.get("user_id")
+            if not access_token:
+                return self.send_json({"error": "Instagram returned no access_token", "raw": short}, 502)
+
+            # long-lived exchange
+            try:
+                url2 = "https://graph.instagram.com/access_token?" + urllib.parse.urlencode({
+                    "grant_type": "ig_exchange_token",
+                    "client_secret": client_secret,
+                    "access_token": access_token,
+                })
+                with urllib.request.urlopen(urllib.request.Request(url2), timeout=20) as resp:
+                    long_lived = json.loads(resp.read().decode("utf-8"))
+                long_token = long_lived.get("access_token") or access_token
+                expires_in = long_lived.get("expires_in", 3600)
+            except Exception:
+                long_token = access_token
+                expires_in = 3600
+
+            return self.send_json({"access_token": long_token, "user_id": user_id, "expires_in": expires_in, "token_type": "bearer"}, 200)
+        except Exception as e:
+            return self.send_json({"error": str(e)}, 500)
 
     def handle_legal_page(self, kind):
         # Minimal pages required by Meta for OAuth app review.
