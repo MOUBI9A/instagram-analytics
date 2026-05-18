@@ -2169,6 +2169,15 @@
     </footer>
 
     <div id="fb-root"></div>
+    <script>
+      // Auth config — env-var driven via /api/config (Vercel) or local env
+      // (server.py). app.js awaits PULSE_AUTH_CONFIG_READY before initAuth.
+      window.PULSE_AUTH_CONFIG = window.PULSE_AUTH_CONFIG || {};
+      window.PULSE_AUTH_CONFIG_READY = fetch("/api/config", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : {}))
+        .then((cfg) => Object.assign(window.PULSE_AUTH_CONFIG, cfg || {}))
+        .catch(() => {});
+    </script>
     <script src="app.js"></script>
     <script>
       lucide.createIcons();

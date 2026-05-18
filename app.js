@@ -8429,8 +8429,11 @@ function initAuth() {
 
   updateAuthBtnLabel();
 }
+function bootAuth() {
+  Promise.resolve(window.PULSE_AUTH_CONFIG_READY).then(initAuth);
+}
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initAuth);
+  document.addEventListener("DOMContentLoaded", bootAuth);
 } else {
-  initAuth();
+  bootAuth();
 }

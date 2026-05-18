@@ -332,6 +332,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.handle_cache_delete(p)
         if p.path == "/api/tunnel/status":
             return self.send_json(TUNNEL.status_snapshot(), 200)
+        if p.path == "/api/config":
+            return self.handle_config()
         if p.path == "/privacy":
             return self.handle_legal_page("privacy")
         if p.path == "/terms":
@@ -354,6 +356,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if p.path == "/api/instagram/exchange":
             return self.handle_instagram_exchange()
         self.send_error(404, "Not found")
+
+    def handle_config(self):
+        cfg = {}
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_ANON_KEY")
+        if url and key:
+            cfg["supabaseUrl"] = url
+            cfg["supabaseAnonKey"] = key
+        return self.send_json(cfg, 200)
 
     def handle_instagram_exchange(self):
         try:

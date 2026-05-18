@@ -115,28 +115,38 @@ Approval typically takes 3-10 business days.
 
 ## 3. Supabase auth
 
-The dashboard's **Sign in** button is wired but currently runs in demo mode (no backend). To enable real magic-link auth across devices:
+The dashboard's **Sign in** button reads its config from `/api/config`, an env-var driven Vercel function (`api/config.py`). No code edits or commits needed — just set two env vars.
 
-1. Go to [supabase.com](https://supabase.com) → **New project** → free tier
-2. Once provisioned, copy from **Settings → API**:
-   - Project URL (e.g. `https://xxxxx.supabase.co`)
-   - **anon public** key
-3. In **Authentication → URL Configuration**, add your deployment URL (e.g. `https://instagram-analytics-omega.vercel.app/`) to the **Site URL** and to the **Redirect URLs** allowlist
-4. In **Authentication → Email Templates**, customize the magic-link email if you want
-5. Open `index.html` in this repo. Just before the closing `</body>` tag (or near the top of the body), add this script:
+1. Go to [supabase.com](https://supabase.com) → **New project** → free tier (skip if you already have one)
+2. Once provisioned, copy from **Project Settings → API**:
+   - **Project URL** (e.g. `https://xxxxx.supabase.co`)
+   - **Publishable key** (`sb_publishable_...`) — or the legacy **anon public** JWT if you prefer; both work
+3. In **Vercel → your project → Settings → Environment Variables**, add for the **Production** + **Preview** environments:
 
-   ```html
-   <script>
-     window.PULSE_AUTH_CONFIG = {
-       supabaseUrl: "https://YOUR-PROJECT.supabase.co",
-       supabaseAnonKey: "YOUR-ANON-KEY"
-     };
-   </script>
-   ```
+   | Name | Value |
+   |---|---|
+   | `SUPABASE_URL` | the Project URL from step 2 |
+   | `SUPABASE_ANON_KEY` | the publishable or legacy anon key from step 2 |
 
-6. Commit + push. Vercel auto-redeploys. The **Sign in** button now sends real magic-link emails.
+4. In Supabase **Authentication → URL Configuration**:
+   - **Site URL**: `https://<your-vercel-domain>` (e.g. `https://instagram-analytics-omega.vercel.app`)
+   - **Redirect URLs**: add the same domain (and any custom domain from Section 1, and `http://localhost:8000` for local dev)
+5. Redeploy: **Vercel → Deployments → … → Redeploy** on the latest deployment (env-var changes don't auto-rebuild)
+6. Hit the deployed URL — Sign in now sends real magic-link emails
 
-The dashboard frontend automatically picks up the access_token when the user clicks the link in their email — no further code changes needed.
+The frontend picks up the magic-link `access_token` automatically when the user lands back on the page — no extra wiring needed.
+
+### Local development
+
+`server.py` exposes the same `/api/config` route. To test auth locally without committing the URL/key into the repo:
+
+```sh
+export SUPABASE_URL="https://YOUR-PROJECT.supabase.co"
+export SUPABASE_ANON_KEY="sb_publishable_..."   # or legacy anon JWT
+sh run.sh
+```
+
+Without these env vars set, the dashboard transparently falls back to demo mode (a fake local-only "user").
 
 ### Syncing data to Supabase (optional, advanced)
 
