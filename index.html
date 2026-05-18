@@ -199,6 +199,12 @@
           <span class="inline-flex items-center gap-2"><i data-lucide="git-compare" class="w-4 h-4"></i>Compare</span>
         </button>
         <button
+          data-mode="discover"
+          class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition"
+        >
+          <span class="inline-flex items-center gap-2"><i data-lucide="compass" class="w-4 h-4"></i>Discover</span>
+        </button>
+        <button
           data-mode="concepts"
           class="mode-tab px-4 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition"
         >
@@ -567,6 +573,175 @@
             </div>
           </div>
           <div id="concepts-results" class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        </div>
+      </section>
+
+      <!-- DISCOVER panel -->
+      <section id="discover-panel" class="mb-8 hidden">
+        <div class="glass-card p-6 sm:p-8">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-amber-400/20 border border-white/10 flex items-center justify-center">
+              <i data-lucide="compass" class="w-5 h-5 text-fuchsia-300"></i>
+            </div>
+            <div class="flex-1">
+              <h2 class="font-display text-xl font-semibold">Discover influencers <span class="ml-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-200 align-middle">AI-powered</span></h2>
+              <p class="text-sm text-slate-400 mt-1.5 max-w-2xl">
+                Pick a niche and a country (and any other filters). The platform asks your configured AI
+                for candidate creators in that segment, then verifies each one with a live Instagram lookup
+                so you only see <span class="text-slate-200">accounts that actually exist</span>, with
+                <span class="text-fuchsia-300">real follower counts and engagement</span>.
+              </p>
+            </div>
+          </div>
+
+          <!-- filters -->
+          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Niche</label>
+              <select id="discover-niche" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60">
+                <option value="fitness">Fitness & wellness</option>
+                <option value="fashion">Fashion</option>
+                <option value="beauty">Beauty & skincare</option>
+                <option value="food">Food & cooking</option>
+                <option value="travel">Travel</option>
+                <option value="tech">Tech & gadgets</option>
+                <option value="gaming">Gaming</option>
+                <option value="finance">Finance & investing</option>
+                <option value="business">Business & entrepreneurship</option>
+                <option value="parenting">Parenting & family</option>
+                <option value="education">Education & study</option>
+                <option value="lifestyle">Lifestyle</option>
+                <option value="music">Music</option>
+                <option value="art">Art & design</option>
+                <option value="photography">Photography</option>
+                <option value="comedy">Comedy & entertainment</option>
+                <option value="sports">Sports</option>
+                <option value="cars">Cars & motorsports</option>
+                <option value="real-estate">Real estate</option>
+                <option value="pets">Pets & animals</option>
+                <option value="diy">DIY & home improvement</option>
+                <option value="dance">Dance</option>
+                <option value="books">Books & literature</option>
+                <option value="motivation">Motivation & self-help</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <input id="discover-niche-custom" type="text" placeholder="e.g. vegan-meal-prep" class="hidden mt-2 w-full bg-black/40 border border-fuchsia-400/30 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Country / Region</label>
+              <select id="discover-country" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60">
+                <option value="any">Any / Global</option>
+                <option value="US">United States</option>
+                <option value="UK">United Kingdom</option>
+                <option value="CA">Canada</option>
+                <option value="AU">Australia</option>
+                <option value="FR">France</option>
+                <option value="DE">Germany</option>
+                <option value="ES">Spain</option>
+                <option value="IT">Italy</option>
+                <option value="NL">Netherlands</option>
+                <option value="MA">Morocco</option>
+                <option value="DZ">Algeria</option>
+                <option value="TN">Tunisia</option>
+                <option value="EG">Egypt</option>
+                <option value="SA">Saudi Arabia</option>
+                <option value="AE">United Arab Emirates</option>
+                <option value="BR">Brazil</option>
+                <option value="MX">Mexico</option>
+                <option value="AR">Argentina</option>
+                <option value="IN">India</option>
+                <option value="PK">Pakistan</option>
+                <option value="ID">Indonesia</option>
+                <option value="PH">Philippines</option>
+                <option value="JP">Japan</option>
+                <option value="KR">South Korea</option>
+                <option value="TR">Turkey</option>
+                <option value="NG">Nigeria</option>
+                <option value="ZA">South Africa</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <input id="discover-country-custom" type="text" placeholder="e.g. Casablanca" class="hidden mt-2 w-full bg-black/40 border border-fuchsia-400/30 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Follower range</label>
+              <select id="discover-tier" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60">
+                <option value="any">Any size</option>
+                <option value="nano">Nano · &lt; 10K</option>
+                <option value="micro" selected>Micro · 10K–100K</option>
+                <option value="mid">Mid · 100K–1M</option>
+                <option value="macro">Macro · 1M+</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Language</label>
+              <select id="discover-language" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400/60">
+                <option value="any">Any</option>
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="ar">Arabic</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="pt">Portuguese</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="tr">Turkish</option>
+                <option value="hi">Hindi</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
+            <span class="text-slate-500">Min engagement:</span>
+            <div class="flex flex-wrap gap-1.5" data-discover-filter="minEr">
+              <button data-val="0" class="concept-filter-btn active">Any</button>
+              <button data-val="1" class="concept-filter-btn">1%+</button>
+              <button data-val="3" class="concept-filter-btn">3%+</button>
+              <button data-val="6" class="concept-filter-btn">6%+ (top tier)</button>
+            </div>
+            <span class="text-slate-600">·</span>
+            <span class="text-slate-500">Account type:</span>
+            <div class="flex flex-wrap gap-1.5" data-discover-filter="acctType">
+              <button data-val="any" class="concept-filter-btn active">Any</button>
+              <button data-val="business" class="concept-filter-btn">Business</button>
+              <button data-val="creator" class="concept-filter-btn">Creator</button>
+              <button data-val="verified" class="concept-filter-btn">Verified ✓</button>
+            </div>
+          </div>
+
+          <!-- engine + action -->
+          <div class="mt-5 flex flex-wrap items-center gap-3 p-3 rounded-xl bg-black/30 border border-white/5">
+            <i data-lucide="sparkles" class="w-4 h-4 text-fuchsia-300 shrink-0"></i>
+            <div class="flex-1 min-w-0">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400">AI engine</div>
+              <div id="discover-engine-label" class="text-xs text-slate-300">No AI key configured — set one up in the AI panel</div>
+            </div>
+            <span class="text-[11px] text-slate-500">How many?</span>
+            <select id="discover-count" class="bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs">
+              <option value="10">10</option>
+              <option value="15" selected>15</option>
+              <option value="25">25</option>
+              <option value="40">40</option>
+            </select>
+          </div>
+
+          <div id="discover-ai-key-warning" class="hidden mt-2 text-xs text-amber-200 bg-amber-500/8 border border-amber-400/25 rounded-lg px-3 py-2">
+            Discover needs an AI key (free Gemini works great).
+            <button id="discover-go-ai-key" class="underline text-fuchsia-300 hover:text-fuchsia-200">Open the AI panel</button>
+            and paste a key, then come back.
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              id="discover-find-btn"
+              class="px-5 py-2.5 rounded-lg bg-gradient-to-tr from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white text-sm font-semibold shadow-lg shadow-pink-500/20 transition inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <i data-lucide="search" class="w-4 h-4"></i>Find influencers
+            </button>
+            <span id="discover-progress" class="hidden text-xs text-slate-400"></span>
+          </div>
+
+          <div id="discover-results" class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </div>
       </section>
 

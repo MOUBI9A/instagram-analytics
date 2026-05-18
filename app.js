@@ -7372,3 +7372,397 @@ function initConceptStudio() {
     );
   }
 })();
+
+// ============================================================
+// DISCOVER — find influencers by niche + country
+// ============================================================
+// Asks the configured AI for candidate usernames matching the criteria,
+// then bulk-looks-up each via /api/lookup to confirm + pull real stats.
+// ============================================================
+
+const discoverState = {
+  filters: { minEr: 0, acctType: "any" },
+  results: [],
+  inflight: false,
+};
+
+const COUNTRY_LABELS = {
+  any: "globally", US: "United States", UK: "the United Kingdom", CA: "Canada", AU: "Australia",
+  FR: "France", DE: "Germany", ES: "Spain", IT: "Italy", NL: "the Netherlands",
+  MA: "Morocco", DZ: "Algeria", TN: "Tunisia", EG: "Egypt", SA: "Saudi Arabia",
+  AE: "the UAE", BR: "Brazil", MX: "Mexico", AR: "Argentina", IN: "India",
+  PK: "Pakistan", ID: "Indonesia", PH: "the Philippines", JP: "Japan", KR: "South Korea",
+  TR: "Turkey", NG: "Nigeria", ZA: "South Africa",
+};
+
+const LANG_LABELS = {
+  any: "", en: "English", fr: "French", es: "Spanish", ar: "Arabic", de: "German",
+  it: "Italian", pt: "Portuguese", ja: "Japanese", ko: "Korean", tr: "Turkish", hi: "Hindi",
+};
+
+const TIER_RANGES = {
+  any: [0, Infinity],
+  nano: [0, 10_000],
+  micro: [10_000, 100_000],
+  mid: [100_000, 1_000_000],
+  macro: [1_000_000, Infinity],
+};
+
+function buildDiscoverPrompt({ niche, country, language, tier, count }) {
+  const countryLbl = COUNTRY_LABELS[country] || country || "globally";
+  const langLbl = LANG_LABELS[language] || "";
+  const tierRange = TIER_RANGES[tier];
+  const tierDesc = tier === "any" ? "any follower count"
+    : tier === "nano" ? "under 10K followers"
+    : tier === "micro" ? "between 10K and 100K followers"
+    : tier === "mid" ? "between 100K and 1M followers"
+    : "over 1M followers";
+
+  const system = (
+    "You are an Instagram influencer-discovery expert. Given a niche, country, language, and audience size, " +
+    "you return REAL, ACTIVE Instagram usernames that match the criteria. " +
+    "You only list usernames you are confident exist publicly on Instagram. " +
+    "You NEVER make up usernames. If unsure, list fewer. " +
+    "You always respond with a strict JSON array — no prose, no markdown fence."
+  );
+
+  const user = `List ${count} Instagram usernames of creators / influencers in this niche and segment:
+
+- Niche: ${niche}
+- Country / Region: ${countryLbl}
+- Primary language: ${langLbl || "any"}
+- Audience size: ${tierDesc}
+
+Constraints:
+- Only return usernames you are CONFIDENT exist publicly on Instagram (no guessing, no made-up names).
+- Prefer accounts that are active in the last 12 months.
+- Mix established names with rising creators when possible.
+- Skip mega-celebrities unless the country/niche makes them obviously relevant.
+
+Return ONLY a JSON array of objects with these fields:
+[
+  {
+    "username": "string (the @ handle, without the @)",
+    "why": "1 sentence — why they fit this niche + country (max 140 chars)",
+    "specialty": "1-3 word tag (e.g. 'vegan meal prep', 'street fashion')"
+  }
+]
+
+No prose. No markdown fence. Just the JSON array.`;
+
+  return { system, user };
+}
+
+function parseDiscoverAiResponse(text) {
+  if (!text) return [];
+  let s = text.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) s = fence[1].trim();
+  const first = s.indexOf("[");
+  const last = s.lastIndexOf("]");
+  if (first === -1 || last === -1 || last < first) return [];
+  s = s.slice(first, last + 1);
+  try {
+    const arr = JSON.parse(s);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter(o => o && typeof o.username === "string")
+      .map(o => ({
+        username: o.username.replace(/^@+/, "").trim(),
+        why: String(o.why || ""),
+        specialty: String(o.specialty || ""),
+      }))
+      .filter(o => /^[\w.]{1,30}$/.test(o.username));
+  } catch {
+    return [];
+  }
+}
+
+async function bulkLookup(usernames, onProgress) {
+  // sequential to be polite + survive rate limits
+  const out = [];
+  let i = 0;
+  for (const u of usernames) {
+    i++;
+    if (onProgress) onProgress(i, usernames.length, u);
+    try {
+      const r = await fetch(`/api/lookup?username=${encodeURIComponent(u)}`);
+      const d = await r.json();
+      if (r.ok && d && d.available) {
+        out.push(d);
+        recordConceptSource(d); // also feed into Concept Studio history
+      } else {
+        out.push({ username: u, available: false, error: d?.error || `HTTP ${r.status}` });
+      }
+    } catch (e) {
+      out.push({ username: u, available: false, error: e.message });
+    }
+    // small pacing between requests
+    await new Promise(res => setTimeout(res, 350));
+  }
+  return out;
+}
+
+function applyDiscoverFilters(profiles) {
+  const { minEr, acctType } = discoverState.filters;
+  return profiles.filter(p => {
+    if (!p.available) return false;
+    const er = p.followers && p.posts?.length
+      ? (p.posts.reduce((s, x) => s + (x.likes || 0) + (x.comments || 0), 0) / p.posts.length / p.followers) * 100
+      : 0;
+    if (minEr && er < minEr) return false;
+    if (acctType === "business" && !p.is_business) return false;
+    if (acctType === "creator" && !p.is_professional && !p.is_business) return false;
+    if (acctType === "verified" && !p.is_verified) return false;
+    return true;
+  });
+}
+
+function renderDiscoverResults(profiles, meta) {
+  const wrap = $("discover-results");
+  wrap.innerHTML = "";
+  if (!profiles.length) {
+    wrap.innerHTML = `<div class="col-span-full text-center py-10 text-slate-500 text-sm">
+      <i data-lucide="search-x" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+      <p>No accounts matched. Try a different country, niche, or lower the engagement floor.</p>
+      ${meta?.totalLookedUp ? `<p class="mt-1 text-xs text-slate-600">Looked up ${meta.totalLookedUp} candidates · ${meta.unavailable} were unavailable / private / deleted.</p>` : ""}
+    </div>`;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+  // sort by followers desc
+  profiles.sort((a, b) => (b.followers || 0) - (a.followers || 0));
+  for (const p of profiles) {
+    const card = document.createElement("div");
+    card.className = "concept-card";
+    const initial = (p.full_name || p.username || "?").charAt(0).toUpperCase();
+    const picSrc = p.profile_pic_url ? `/api/image?url=${encodeURIComponent(p.profile_pic_url)}` : "";
+    const er = p.followers && p.posts?.length
+      ? (p.posts.reduce((s, x) => s + (x.likes || 0) + (x.comments || 0), 0) / p.posts.length / p.followers) * 100
+      : 0;
+    const badges = [];
+    if (p.is_verified) badges.push(`<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-sky-400/30 text-sky-300 bg-sky-500/10">Verified</span>`);
+    if (p.is_business) badges.push(`<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">Business</span>`);
+    else if (p.is_professional) badges.push(`<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-fuchsia-400/30 text-fuchsia-300 bg-fuchsia-500/10">Creator</span>`);
+    if (p.is_private) badges.push(`<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-rose-400/30 text-rose-300 bg-rose-500/10">Private</span>`);
+
+    card.innerHTML = `
+      <div class="flex items-start gap-3">
+        <div class="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-fuchsia-500/30 to-purple-500/20 border border-white/10 flex items-center justify-center text-white font-semibold shrink-0">
+          ${picSrc ? `<img src="${picSrc}" class="w-full h-full object-cover" onerror="this.replaceWith(Object.assign(document.createElement('span'), {textContent: '${initial}'}))" />` : initial}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-display font-semibold text-sm text-white truncate">${escapeHtml(p.full_name || p.username)}</div>
+          <div class="text-xs text-fuchsia-300">@${escapeHtml(p.username)}</div>
+          <div class="flex flex-wrap gap-1 mt-1.5">${badges.join("")}</div>
+        </div>
+      </div>
+      ${p._discover_why ? `<div class="concept-why italic">"${escapeHtml(p._discover_why)}"</div>` : ""}
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-black/30 border border-white/5 rounded-lg p-2">
+          <div class="font-display font-semibold text-sm text-white">${fmt(p.followers)}</div>
+          <div class="text-[9px] uppercase tracking-wider text-slate-500">Followers</div>
+        </div>
+        <div class="bg-black/30 border border-white/5 rounded-lg p-2">
+          <div class="font-display font-semibold text-sm text-white">${er.toFixed(1)}%</div>
+          <div class="text-[9px] uppercase tracking-wider text-slate-500">Engagement</div>
+        </div>
+        <div class="bg-black/30 border border-white/5 rounded-lg p-2">
+          <div class="font-display font-semibold text-sm text-white">${fmt(p.posts_count)}</div>
+          <div class="text-[9px] uppercase tracking-wider text-slate-500">Posts</div>
+        </div>
+      </div>
+      ${p._discover_specialty ? `<div class="text-[10px] text-slate-400"><i data-lucide="tag" class="w-3 h-3 inline -mt-0.5"></i> ${escapeHtml(p._discover_specialty)}</div>` : ""}
+      <div class="flex flex-wrap gap-2 mt-auto pt-3 border-t border-white/5">
+        <button data-discover-action="lookup" data-username="${escapeHtml(p.username)}" class="text-xs px-2.5 py-1.5 rounded-md bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-200 transition inline-flex items-center gap-1">
+          <i data-lucide="search" class="w-3 h-3"></i>Open
+        </button>
+        <button data-discover-action="watch" data-username="${escapeHtml(p.username)}" class="text-xs px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition inline-flex items-center gap-1">
+          <i data-lucide="bookmark" class="w-3 h-3"></i>Watch
+        </button>
+        <button data-discover-action="concept" data-username="${escapeHtml(p.username)}" class="text-xs px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition inline-flex items-center gap-1">
+          <i data-lucide="lightbulb" class="w-3 h-3"></i>Concepts
+        </button>
+      </div>`;
+    wrap.appendChild(card);
+  }
+  // wire actions
+  wrap.querySelectorAll("[data-discover-action]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.discoverAction;
+      const u = btn.dataset.username;
+      if (action === "lookup") {
+        setMode("lookup");
+        $("lookup-input").value = u;
+        setTimeout(() => $("lookup-btn").click(), 100);
+      } else if (action === "watch") {
+        if (addToWatchlist(u)) {
+          btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i>Tracked`;
+          if (window.lucide) window.lucide.createIcons();
+        }
+      } else if (action === "concept") {
+        conceptStudioState.selected.clear();
+        conceptStudioState.selected.add(u.toLowerCase());
+        setMode("concepts");
+      }
+    });
+  });
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function refreshDiscoverEngineLabel() {
+  const creds = getAiCreds();
+  const label = $("discover-engine-label");
+  const warn = $("discover-ai-key-warning");
+  if (creds) {
+    label.textContent = `${aiProviderLabel(creds.provider)} · ${creds.model}`;
+    warn.classList.add("hidden");
+  } else {
+    label.textContent = "No AI key configured";
+    warn.classList.remove("hidden");
+  }
+}
+
+function initDiscover() {
+  if (!$("discover-panel")) return;
+
+  // Niche/Country custom toggle
+  $("discover-niche").addEventListener("change", (e) => {
+    $("discover-niche-custom").classList.toggle("hidden", e.target.value !== "custom");
+  });
+  $("discover-country").addEventListener("change", (e) => {
+    $("discover-country-custom").classList.toggle("hidden", e.target.value !== "custom");
+  });
+
+  // Filter button groups
+  document.querySelectorAll("[data-discover-filter]").forEach(group => {
+    const key = group.dataset.discoverFilter;
+    group.querySelectorAll(".concept-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        group.querySelectorAll(".concept-filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const v = btn.dataset.val;
+        discoverState.filters[key] = key === "minEr" ? parseFloat(v) : v;
+        // re-filter existing results in place
+        if (discoverState.results.length) {
+          const filtered = applyDiscoverFilters(discoverState.results);
+          renderDiscoverResults(filtered, { totalLookedUp: discoverState.results.length, unavailable: discoverState.results.filter(p => !p.available).length });
+        }
+      });
+    });
+  });
+
+  $("discover-go-ai-key").addEventListener("click", () => {
+    setMode("lookup");
+    setTimeout(() => {
+      const keyInput = $("ai-key");
+      if (keyInput) { keyInput.scrollIntoView({ behavior: "smooth", block: "center" }); keyInput.focus(); }
+    }, 200);
+  });
+
+  $("discover-find-btn").addEventListener("click", async () => {
+    if (discoverState.inflight) return;
+    const creds = getAiCreds();
+    if (!creds) {
+      $("discover-ai-key-warning").classList.remove("hidden");
+      return;
+    }
+    const nicheSel = $("discover-niche").value;
+    const niche = nicheSel === "custom" ? $("discover-niche-custom").value.trim() : nicheSel;
+    if (!niche) return;
+    const countrySel = $("discover-country").value;
+    const country = countrySel === "custom" ? $("discover-country-custom").value.trim() : countrySel;
+    const language = $("discover-language").value;
+    const tier = $("discover-tier").value;
+    const count = parseInt($("discover-count").value, 10) || 15;
+
+    const btn = $("discover-find-btn");
+    const progress = $("discover-progress");
+    const wrap = $("discover-results");
+    discoverState.inflight = true;
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>Asking AI…`;
+    if (window.lucide) window.lucide.createIcons();
+    progress.classList.remove("hidden");
+    progress.textContent = `Asking ${aiProviderLabel(creds.provider)} for ${count} candidates…`;
+    wrap.innerHTML = "";
+
+    try {
+      const { system, user } = buildDiscoverPrompt({ niche, country, language, tier, count });
+      const raw = await callAi(creds, system, user);
+      const candidates = parseDiscoverAiResponse(raw);
+      if (!candidates.length) throw new Error("AI returned no parseable candidates");
+
+      progress.textContent = `AI proposed ${candidates.length} candidates. Verifying via Instagram…`;
+      btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>Verifying…`;
+      if (window.lucide) window.lucide.createIcons();
+
+      const profiles = await bulkLookup(
+        candidates.map(c => c.username),
+        (i, total, u) => { progress.textContent = `Verifying ${i} / ${total} · @${u}`; }
+      );
+
+      // attach AI-supplied "why" and "specialty" to each profile
+      for (const p of profiles) {
+        const candidate = candidates.find(c => c.username.toLowerCase() === (p.username || "").toLowerCase());
+        if (candidate) {
+          p._discover_why = candidate.why;
+          p._discover_specialty = candidate.specialty;
+        }
+      }
+
+      // apply tier filter (post-lookup since we now know real follower counts)
+      const tierRange = TIER_RANGES[tier];
+      const tierFiltered = profiles.filter(p => {
+        if (!p.available) return false;
+        if (!p.followers) return tier === "any";
+        return p.followers >= tierRange[0] && p.followers <= tierRange[1];
+      });
+
+      discoverState.results = tierFiltered;
+      const filtered = applyDiscoverFilters(tierFiltered);
+      const unavailable = profiles.filter(p => !p.available).length;
+      renderDiscoverResults(filtered, { totalLookedUp: profiles.length, unavailable });
+      progress.textContent = `Found ${filtered.length} matches · verified ${profiles.length} · ${unavailable} unavailable`;
+    } catch (e) {
+      wrap.innerHTML = `<div class="col-span-full text-center py-10 text-rose-300 text-sm">
+        <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-2"></i>
+        <p>${escapeHtml(e.message)}</p>
+      </div>`;
+      progress.classList.add("hidden");
+      if (window.lucide) window.lucide.createIcons();
+    } finally {
+      discoverState.inflight = false;
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="search" class="w-4 h-4"></i>Find influencers`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
+
+  refreshDiscoverEngineLabel();
+}
+
+// patch setMode to handle the discover tab
+(function patchModeForDiscover() {
+  if (typeof setMode !== "function") return;
+  const orig = setMode;
+  window.setMode = function (mode) {
+    const r = orig.apply(this, arguments);
+    const p = $("discover-panel");
+    if (p) {
+      p.classList.toggle("hidden", mode !== "discover");
+      if (mode === "discover") refreshDiscoverEngineLabel();
+    }
+    return r;
+  };
+  if (Array.isArray(CMDK_COMMANDS)) {
+    CMDK_COMMANDS.push({ id: "discover", icon: "compass", label: "Discover influencers", run: () => setMode("discover") });
+  }
+})();
+
+// init Discover on DOM ready (already-loaded by the time this runs at file end)
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initDiscover);
+} else {
+  initDiscover();
+}
