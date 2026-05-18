@@ -6943,7 +6943,7 @@ function renderConceptAccountGrid() {
     const initial = (acc.full_name || acc.username || "?").charAt(0).toUpperCase();
     const picSrc = acc.profile_pic_url ? `/api/image?url=${encodeURIComponent(acc.profile_pic_url)}` : "";
     chip.innerHTML = `
-      <div class="chip-avatar">${picSrc ? `<img src="${picSrc}" onerror="this.replaceWith(Object.assign(document.createElement('span'), {textContent: '${initial}'}))" />` : initial}</div>
+      <div class="chip-avatar">${picSrc ? `<img src="${picSrc}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'), {textContent: '${initial}'}))" />` : initial}</div>
       <div class="chip-meta">
         <div class="chip-name">@${acc.username}</div>
         <div class="chip-stats">${fmt(acc.followers)} · ${acc.posts ? acc.posts.length : 0} posts cached</div>
@@ -7386,6 +7386,87 @@ const discoverState = {
   inflight: false,
 };
 
+const LS_DISCOVER_SAVED = "ig_discover_saved_v1";
+function loadDiscoverSaved() {
+  try { return JSON.parse(localStorage.getItem(LS_DISCOVER_SAVED) || "[]"); }
+  catch { return []; }
+}
+function saveDiscoverSaved(arr) {
+  localStorage.setItem(LS_DISCOVER_SAVED, JSON.stringify(arr.slice(0, 20)));
+}
+
+function currentDiscoverFilters() {
+  const nicheSel = $("discover-niche").value;
+  const niche = nicheSel === "custom" ? $("discover-niche-custom").value.trim() : nicheSel;
+  const countrySel = $("discover-country").value;
+  const country = countrySel === "custom" ? $("discover-country-custom").value.trim() : countrySel;
+  return {
+    niche, nicheSel,
+    country, countrySel,
+    language: $("discover-language").value,
+    tier: $("discover-tier").value,
+    count: parseInt($("discover-count").value, 10) || 15,
+    minEr: discoverState.filters.minEr,
+    acctType: discoverState.filters.acctType,
+  };
+}
+
+function applyDiscoverFiltersToUI(f) {
+  $("discover-niche").value = f.nicheSel || (f.niche ? "custom" : "fitness");
+  if ((f.nicheSel || "") === "custom") {
+    $("discover-niche-custom").classList.remove("hidden");
+    $("discover-niche-custom").value = f.niche || "";
+  } else {
+    $("discover-niche-custom").classList.add("hidden");
+  }
+  $("discover-country").value = f.countrySel || f.country || "any";
+  if ((f.countrySel || "") === "custom") {
+    $("discover-country-custom").classList.remove("hidden");
+    $("discover-country-custom").value = f.country || "";
+  } else {
+    $("discover-country-custom").classList.add("hidden");
+  }
+  $("discover-language").value = f.language || "any";
+  $("discover-tier").value = f.tier || "any";
+  $("discover-count").value = String(f.count || 15);
+  discoverState.filters.minEr = f.minEr || 0;
+  discoverState.filters.acctType = f.acctType || "any";
+  // sync filter button states
+  document.querySelectorAll("[data-discover-filter='minEr'] .concept-filter-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.dataset.val) === discoverState.filters.minEr);
+  });
+  document.querySelectorAll("[data-discover-filter='acctType'] .concept-filter-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.val === discoverState.filters.acctType);
+  });
+}
+
+function renderDiscoverSavedChips() {
+  const saved = loadDiscoverSaved();
+  const row = $("discover-saved-row");
+  const list = $("discover-saved-list");
+  if (!row || !list) return;
+  row.classList.toggle("hidden", !saved.length);
+  list.innerHTML = "";
+  saved.forEach((q, idx) => {
+    const chip = document.createElement("button");
+    chip.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 border border-fuchsia-400/25 hover:border-fuchsia-400/60 text-xs text-fuchsia-200 transition";
+    chip.innerHTML = `<i data-lucide="star" class="w-3 h-3"></i>${escapeHtml(q.label)}<i data-lucide="x" class="w-3 h-3 ml-1 opacity-50 hover:opacity-100 saved-x"></i>`;
+    chip.addEventListener("click", (e) => {
+      if (e.target.classList.contains("saved-x")) {
+        const arr = loadDiscoverSaved();
+        arr.splice(idx, 1);
+        saveDiscoverSaved(arr);
+        renderDiscoverSavedChips();
+        return;
+      }
+      applyDiscoverFiltersToUI(q);
+      $("discover-find-btn").click();
+    });
+    list.appendChild(chip);
+  });
+  if (window.lucide) window.lucide.createIcons();
+}
+
 const COUNTRY_LABELS = {
   any: "globally", US: "United States", UK: "the United Kingdom", CA: "Canada", AU: "Australia",
   FR: "France", DE: "Germany", ES: "Spain", IT: "Italy", NL: "the Netherlands",
@@ -7549,7 +7630,7 @@ function renderDiscoverResults(profiles, meta) {
     card.innerHTML = `
       <div class="flex items-start gap-3">
         <div class="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-fuchsia-500/30 to-purple-500/20 border border-white/10 flex items-center justify-center text-white font-semibold shrink-0">
-          ${picSrc ? `<img src="${picSrc}" class="w-full h-full object-cover" onerror="this.replaceWith(Object.assign(document.createElement('span'), {textContent: '${initial}'}))" />` : initial}
+          ${picSrc ? `<img src="${picSrc}" loading="lazy" decoding="async" class="w-full h-full object-cover" onerror="this.replaceWith(Object.assign(document.createElement('span'), {textContent: '${initial}'}))" />` : initial}
         </div>
         <div class="flex-1 min-w-0">
           <div class="font-display font-semibold text-sm text-white truncate">${escapeHtml(p.full_name || p.username)}</div>
@@ -7724,6 +7805,13 @@ function initDiscover() {
       const unavailable = profiles.filter(p => !p.available).length;
       renderDiscoverResults(filtered, { totalLookedUp: profiles.length, unavailable });
       progress.textContent = `Found ${filtered.length} matches · verified ${profiles.length} · ${unavailable} unavailable`;
+      // reveal save + bulk-concepts buttons now that we have results
+      if (filtered.length) {
+        $("discover-save-btn").classList.remove("hidden");
+        $("discover-bulk-concepts-btn").classList.remove("hidden");
+        $("discover-bulk-concepts-btn").innerHTML = `<i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>Concepts for all ${filtered.length}`;
+        if (window.lucide) window.lucide.createIcons();
+      }
     } catch (e) {
       wrap.innerHTML = `<div class="col-span-full text-center py-10 text-rose-300 text-sm">
         <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-2"></i>
@@ -7739,6 +7827,45 @@ function initDiscover() {
     }
   });
 
+  // Save query
+  $("discover-save-btn").addEventListener("click", () => {
+    const f = currentDiscoverFilters();
+    if (!f.niche) return;
+    const arr = loadDiscoverSaved();
+    const label = `${f.niche} · ${COUNTRY_LABELS[f.country] || f.country || "global"}${f.tier !== "any" ? " · " + f.tier : ""}`;
+    // dedupe
+    const idx = arr.findIndex(x => x.niche === f.niche && x.country === f.country && x.tier === f.tier && x.language === f.language);
+    if (idx >= 0) arr.splice(idx, 1);
+    arr.unshift({ ...f, label, savedAt: Date.now() });
+    saveDiscoverSaved(arr);
+    renderDiscoverSavedChips();
+    const btn = $("discover-save-btn");
+    btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i>Saved`;
+    if (window.lucide) window.lucide.createIcons();
+    setTimeout(() => {
+      btn.innerHTML = `<i data-lucide="star" class="w-3.5 h-3.5"></i>Save query`;
+      if (window.lucide) window.lucide.createIcons();
+    }, 1500);
+  });
+
+  // Bulk concepts: push every available result into Concept Studio history,
+  // select them all, switch tabs, and trigger generation.
+  $("discover-bulk-concepts-btn").addEventListener("click", () => {
+    const profiles = (discoverState.results || []).filter(p => p.available);
+    if (!profiles.length) return;
+    conceptStudioState.selected.clear();
+    for (const p of profiles) {
+      try { recordConceptSource(p); } catch {}
+      conceptStudioState.selected.add(p.username.toLowerCase());
+    }
+    setMode("concepts");
+    setTimeout(() => {
+      const btn = $("concepts-generate-btn");
+      if (btn && !btn.disabled) btn.click();
+    }, 200);
+  });
+
+  renderDiscoverSavedChips();
   refreshDiscoverEngineLabel();
 }
 
@@ -7765,4 +7892,162 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initDiscover);
 } else {
   initDiscover();
+}
+
+// ============================================================
+// AUTH (Pulse-level account, optional)
+// ============================================================
+// Frontend scaffold for sign-in. Defaults to demo mode (no backend).
+// To wire real auth: set window.PULSE_AUTH_CONFIG in index.html or
+// via /api/config, with supabaseUrl + supabaseAnonKey (or another provider).
+// See DEPLOY.md for the full setup.
+// ============================================================
+
+const LS_AUTH_USER = "ig_auth_user_v1";
+
+function getAuthConfig() {
+  return window.PULSE_AUTH_CONFIG || {};
+}
+function isAuthConfigured() {
+  const cfg = getAuthConfig();
+  return !!(cfg.supabaseUrl && cfg.supabaseAnonKey) || !!cfg.customAuthEndpoint;
+}
+function loadAuthUser() {
+  try { return JSON.parse(localStorage.getItem(LS_AUTH_USER) || "null"); }
+  catch { return null; }
+}
+function saveAuthUser(u) {
+  if (u) localStorage.setItem(LS_AUTH_USER, JSON.stringify(u));
+  else localStorage.removeItem(LS_AUTH_USER);
+  updateAuthBtnLabel();
+}
+function updateAuthBtnLabel() {
+  const u = loadAuthUser();
+  const lbl = $("auth-open-label");
+  if (!lbl) return;
+  if (u && u.email) {
+    lbl.textContent = u.email.split("@")[0];
+  } else {
+    lbl.textContent = "Sign in";
+  }
+}
+
+async function authSubmitMagicLink(email) {
+  const cfg = getAuthConfig();
+  if (cfg.supabaseUrl && cfg.supabaseAnonKey) {
+    // Supabase magic-link flow (no SDK needed; raw REST call)
+    const res = await fetch(`${cfg.supabaseUrl}/auth/v1/otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": cfg.supabaseAnonKey },
+      body: JSON.stringify({ email, options: { emailRedirectTo: location.origin } }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.msg || err.error_description || `HTTP ${res.status}`);
+    }
+    return { sent: true };
+  }
+  if (cfg.customAuthEndpoint) {
+    const res = await fetch(cfg.customAuthEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return { sent: true };
+  }
+  // demo mode — just stash the email locally as a fake "user"
+  saveAuthUser({ email, demo: true, signedInAt: Date.now() });
+  return { sent: false, demo: true };
+}
+
+function openAuthModal() {
+  const modal = $("auth-modal");
+  if (!modal) return;
+  // refresh demo banner
+  const demo = $("auth-demo-banner");
+  if (demo) demo.classList.toggle("hidden", isAuthConfigured());
+  // pre-fill if signed-in
+  const u = loadAuthUser();
+  if (u && u.email) $("auth-email").value = u.email;
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+  setTimeout(() => $("auth-email").focus(), 80);
+}
+function closeAuthModal() {
+  const modal = $("auth-modal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+}
+
+function initAuth() {
+  if (!$("auth-modal")) return;
+  // Detect magic-link callback on page load (Supabase appends #access_token=… on success)
+  if (location.hash.includes("access_token=")) {
+    try {
+      const params = new URLSearchParams(location.hash.slice(1));
+      const access_token = params.get("access_token");
+      const cfg = getAuthConfig();
+      if (access_token && cfg.supabaseUrl && cfg.supabaseAnonKey) {
+        // fetch user profile
+        fetch(`${cfg.supabaseUrl}/auth/v1/user`, {
+          headers: { "apikey": cfg.supabaseAnonKey, "Authorization": `Bearer ${access_token}` },
+        }).then(r => r.json()).then(u => {
+          if (u && u.email) saveAuthUser({ email: u.email, id: u.id, access_token });
+          // clean the URL
+          history.replaceState(null, "", location.pathname + location.search);
+        }).catch(() => {});
+      }
+    } catch {}
+  }
+
+  $("auth-open-btn")?.addEventListener("click", openAuthModal);
+  $("auth-close")?.addEventListener("click", closeAuthModal);
+  $("auth-modal")?.addEventListener("click", (e) => {
+    if (e.target.id === "auth-modal") closeAuthModal();
+  });
+  $("auth-submit")?.addEventListener("click", async () => {
+    const email = ($("auth-email").value || "").trim();
+    const status = $("auth-status");
+    const btn = $("auth-submit");
+    status.classList.add("hidden");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      status.classList.remove("hidden");
+      status.className = "text-xs text-center text-rose-300";
+      status.textContent = "That doesn't look like a valid email.";
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = `<span class="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin mr-2 align-middle"></span>Sending…`;
+    try {
+      const r = await authSubmitMagicLink(email);
+      status.classList.remove("hidden");
+      if (r.demo) {
+        status.className = "text-xs text-center text-amber-300";
+        status.textContent = "Demo mode — signed in locally. Wire auth via DEPLOY.md to enable real sync.";
+        setTimeout(closeAuthModal, 1800);
+      } else {
+        status.className = "text-xs text-center text-emerald-300";
+        status.textContent = "Magic link sent. Check your email — click the link to finish signing in.";
+      }
+    } catch (e) {
+      status.classList.remove("hidden");
+      status.className = "text-xs text-center text-rose-300";
+      status.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "Email me a magic link";
+    }
+  });
+  $("auth-email")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("auth-submit").click();
+  });
+
+  updateAuthBtnLabel();
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAuth);
+} else {
+  initAuth();
 }

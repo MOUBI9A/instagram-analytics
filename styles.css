@@ -398,6 +398,28 @@ body {
   overflow: hidden;
 }
 
+/* ----- Mobile polish ----- */
+@media (max-width: 640px) {
+  /* tighter padding for glass-cards on small screens */
+  .glass-card { padding: 1rem !important; }
+  /* prevent horizontal overflow from long URLs/codes */
+  .wizard-paste-row code { font-size: 11px; }
+  /* mode tabs scroll horizontally instead of wrapping awkwardly */
+  #mode-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #mode-tabs::-webkit-scrollbar { display: none; }
+  #mode-tabs .mode-tab { white-space: nowrap; flex-shrink: 0; }
+  /* concept cards stack with more breathing room */
+  .concept-card { padding: 14px; }
+  .concept-title { font-size: 14px; }
+  /* hero headings tighter on phones */
+  .font-display { letter-spacing: -0.01em; }
+}
+
+/* image fade-in (kicks in once browser has loaded the src) */
+img[loading="lazy"] {
+  transition: opacity 0.25s ease;
+}
+
 /* ----- Meta Connect Wizard ----- */
 .wizard-step {
   border-radius: 14px;
