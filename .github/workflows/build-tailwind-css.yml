@@ -31,7 +31,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       - name: Install exact Tailwind compiler
         run: npm install --ignore-scripts --no-audit --no-fund
