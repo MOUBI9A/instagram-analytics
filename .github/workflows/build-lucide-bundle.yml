@@ -41,9 +41,26 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Generate tree-shaken Lucide bundle
+        id: generate
+        continue-on-error: true
         run: npm run build:icons
 
+      - name: Preserve generator diagnostics on failure
+        if: steps.generate.outcome == 'failure'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ -f lucide.diagnostics.json ]; then
+            git add lucide.diagnostics.json package-lock.json
+            if ! git diff --cached --quiet; then
+              git commit -m 'ci: record Lucide generator diagnostics'
+              git push
+            fi
+          fi
+          exit 1
+
       - name: Cut over HTML from Lucide UMD CDN
+        if: steps.generate.outcome == 'success'
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -62,7 +79,6 @@ jobs:
               elif old_count == 0 and new_count == 1:
                   pass
               elif old_count == 0 and new_count == 0:
-                  # Some secondary pages do not load Lucide; that is valid.
                   pass
               else:
                   raise SystemExit(f'{name}: unexpected Lucide tags old={old_count} new={new_count}')
@@ -70,6 +86,7 @@ jobs:
           PY
 
       - name: Verify generated bundle and CDN removal
+        if: steps.generate.outcome == 'success'
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -95,6 +112,7 @@ jobs:
           PY
 
       - name: Commit generated bundle, report, lockfile and cutover
+        if: steps.generate.outcome == 'success'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
