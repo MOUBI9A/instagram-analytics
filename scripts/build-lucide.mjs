@@ -7,11 +7,6 @@ const sourceFiles = ['index.html', 'pricing.html', 'privacy.html', 'terms.html',
 const literalIconNames = new Set();
 const unresolvedDynamicReferences = [];
 
-// Dynamic icon sources verified in app.js:
-// - cached-data banner switches between database / clock
-// - command palette renders c.icon; the icon values are captured by the
-//   object-literal scanner below (search/bookmark/git-compare/archive/zap/
-//   lightbulb/sparkles/compass).
 const explicitDynamicSafelist = ['database', 'clock'];
 for (const name of explicitDynamicSafelist) literalIconNames.add(name);
 
@@ -31,9 +26,6 @@ for (const file of sourceFiles) {
     }
   }
 
-  // Existing rendering helpers keep command-palette icon names in object
-  // literals. Add only values that resolve to a real Lucide export so
-  // unrelated application `icon:` fields cannot inflate the bundle.
   for (const match of text.matchAll(/\bicon\s*:\s*["']([a-z0-9-]+)["']/gi)) {
     const name = match[1].toLowerCase();
     const exportName = toExportName(name);
@@ -41,15 +33,6 @@ for (const file of sourceFiles) {
   }
 }
 
-if (unresolvedDynamicReferences.length) {
-  throw new Error(
-    `Unresolved dynamic data-lucide references need an explicit safelist:\n${unresolvedDynamicReferences.join('\n')}`,
-  );
-}
-
-// Lucide intentionally does not ship brand logos. Pulse already used an
-// Instagram glyph through the old UMD bundle; keep a tiny compatible custom
-// icon so the product mark remains stable without importing a brand package.
 const customIcons = new Set(['instagram']);
 const imports = [];
 const iconEntries = [];
@@ -62,15 +45,32 @@ for (const name of [...literalIconNames].sort()) {
     continue;
   }
   if (!lucide[exportName]) {
-    missing.push(`${name} -> ${exportName}`);
+    missing.push({ name, exportName });
     continue;
   }
   imports.push(exportName);
   iconEntries.push(`${JSON.stringify(exportName)}: ${exportName}`);
 }
 
+const diagnostics = {
+  sourceFiles,
+  scannedIconCount: literalIconNames.size,
+  scannedIcons: [...literalIconNames].sort(),
+  unresolvedDynamicReferences,
+  missingExports: missing,
+  customIcons: [...customIcons].sort(),
+  lucideVersion: '1.59.0',
+};
+await writeFile('lucide.diagnostics.json', `${JSON.stringify(diagnostics, null, 2)}\n`);
+
+if (unresolvedDynamicReferences.length) {
+  throw new Error(
+    `Unresolved dynamic data-lucide references need an explicit safelist:\n${unresolvedDynamicReferences.join('\n')}`,
+  );
+}
+
 if (missing.length) {
-  throw new Error(`Missing Lucide exports:\n${missing.join('\n')}`);
+  throw new Error(`Missing Lucide exports:\n${missing.map((item) => `${item.name} -> ${item.exportName}`).join('\n')}`);
 }
 
 await mkdir('.generated', { recursive: true });
@@ -111,7 +111,7 @@ await build({
 
 const output = await readFile('lucide.generated.js');
 const report = {
-  sourceFiles,
+  ...diagnostics,
   iconCount: literalIconNames.size,
   icons: [...literalIconNames].sort(),
   rawBytes: output.length,
