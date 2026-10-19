@@ -1,0 +1,125 @@
+name: Build curated Lucide bundle
+
+on:
+  push:
+    branches:
+      - perf/lucide-curation-2026-10-19
+    paths:
+      - index.html
+      - pricing.html
+      - privacy.html
+      - terms.html
+      - app.js
+      - package.json
+      - scripts/build-lucide.mjs
+      - .github/workflows/build-lucide-bundle.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-lucide:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: perf/lucide-curation-2026-10-19
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Regenerate lockfile for exact build tooling
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Clean install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Generate tree-shaken Lucide bundle
+        id: generate
+        continue-on-error: true
+        run: npm run build:icons
+
+      - name: Preserve generator diagnostics on failure
+        if: steps.generate.outcome == 'failure'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ -f lucide.diagnostics.json ]; then
+            git add lucide.diagnostics.json package-lock.json
+            if ! git diff --cached --quiet; then
+              git commit -m 'ci: record Lucide generator diagnostics'
+              git push
+            fi
+          fi
+          exit 1
+
+      - name: Cut over HTML from Lucide UMD CDN
+        if: steps.generate.outcome == 'success'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = '<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>'
+          new = '<script src="/lucide.generated.js"></script>'
+          changed = []
+          for name in ('index.html', 'pricing.html'):
+              path = Path(name)
+              text = path.read_text()
+              old_count = text.count(old)
+              new_count = text.count(new)
+              if old_count == 1 and new_count == 0:
+                  path.write_text(text.replace(old, new))
+                  changed.append(name)
+              elif old_count == 0 and new_count == 1:
+                  pass
+              elif old_count == 0 and new_count == 0:
+                  pass
+              else:
+                  raise SystemExit(f'{name}: unexpected Lucide tags old={old_count} new={new_count}')
+          print('cutover_changed=' + ','.join(changed))
+          PY
+
+      - name: Verify generated bundle and CDN removal
+        if: steps.generate.outcome == 'success'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip, json
+
+          bundle = Path('lucide.generated.js').read_bytes()
+          report = json.loads(Path('lucide.generated.json').read_text())
+          index = Path('index.html').read_text()
+          pricing = Path('pricing.html').read_text()
+
+          if 'unpkg.com/lucide@latest' in index or 'unpkg.com/lucide@latest' in pricing:
+              raise SystemExit('Lucide runtime CDN reference remains')
+          if '/lucide.generated.js' not in index:
+              raise SystemExit('index.html does not load curated Lucide bundle')
+          if report['iconCount'] < 10:
+              raise SystemExit(f"Unexpectedly small icon inventory: {report['iconCount']}")
+          if len(bundle) >= 150_000:
+              raise SystemExit(f'Curated bundle too large: {len(bundle)} bytes')
+
+          print(f"icons={report['iconCount']}")
+          print(f'raw_bytes={len(bundle)}')
+          print(f'gzip_bytes={len(gzip.compress(bundle, compresslevel=9))}')
+          PY
+
+      - name: Commit generated bundle, report, lockfile and cutover
+        if: steps.generate.outcome == 'success'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lucide.generated.js lucide.generated.json lucide.diagnostics.json package-lock.json index.html pricing.html
+          if git diff --cached --quiet; then
+            echo 'Generated Lucide bundle, diagnostics and HTML cutover are unchanged.'
+            exit 0
+          fi
+          git commit -m 'perf: generate curated Lucide bundle'
+          git push
