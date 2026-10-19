@@ -1,0 +1,62 @@
+name: Build static Tailwind CSS
+
+on:
+  push:
+    branches:
+      - perf/static-tailwind-2026-10-19
+    paths:
+      - index.html
+      - pricing.html
+      - privacy.html
+      - terms.html
+      - app.js
+      - tailwind.input.css
+      - tailwind.config.cjs
+      - package.json
+      - .github/workflows/build-tailwind-css.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-tailwind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install exact Tailwind compiler
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Generate minified production CSS
+        run: npm run build:css
+
+      - name: Report artifact size
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          data = Path('tailwind.generated.css').read_bytes()
+          print(f'raw_bytes={len(data)}')
+          print(f'gzip_bytes={len(gzip.compress(data, compresslevel=9))}')
+          PY
+
+      - name: Commit generated CSS when changed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tailwind.generated.css package-lock.json
+          if git diff --cached --quiet; then
+            echo 'Generated CSS is unchanged.'
+            exit 0
+          fi
+          git commit -m 'chore: generate static Tailwind CSS'
+          git push
