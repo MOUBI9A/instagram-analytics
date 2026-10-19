@@ -7,7 +7,19 @@ const sourceFiles = ['index.html', 'pricing.html', 'privacy.html', 'terms.html',
 const literalIconNames = new Set();
 const unresolvedDynamicReferences = [];
 
-const explicitDynamicSafelist = ['database', 'clock'];
+// Dynamic icon sources verified in app.js:
+// - cached-data banner switches between database / clock
+// - command palette renders c.icon; object-literal scanner captures its values
+// - Concept Studio renders fmtIcon from FORMAT_ICON plus the "file" fallback
+const explicitDynamicSafelist = [
+  'database',
+  'clock',
+  'film',
+  'layers',
+  'image',
+  'circle-dot',
+  'file',
+];
 for (const name of explicitDynamicSafelist) literalIconNames.add(name);
 
 for (const file of sourceFiles) {
@@ -21,7 +33,8 @@ for (const file of sourceFiles) {
     const expression = match[2];
     const isKnownConditional = expression.includes('data.from_cache') && expression.includes('database') && expression.includes('clock');
     const isCommandPaletteIcon = expression.trim() === 'c.icon';
-    if (!isKnownConditional && !isCommandPaletteIcon) {
+    const isConceptFormatIcon = expression.trim() === 'fmtIcon';
+    if (!isKnownConditional && !isCommandPaletteIcon && !isConceptFormatIcon) {
       unresolvedDynamicReferences.push(`${file}: ${match[0]}`);
     }
   }
