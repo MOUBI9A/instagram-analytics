@@ -116,9 +116,9 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add lucide.generated.js lucide.generated.json package-lock.json index.html pricing.html
+          git add lucide.generated.js lucide.generated.json lucide.diagnostics.json package-lock.json index.html pricing.html
           if git diff --cached --quiet; then
-            echo 'Generated Lucide bundle and HTML cutover are unchanged.'
+            echo 'Generated Lucide bundle, diagnostics and HTML cutover are unchanged.'
             exit 0
           fi
           git commit -m 'perf: generate curated Lucide bundle'
