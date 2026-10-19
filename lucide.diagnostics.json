@@ -6,7 +6,7 @@
     "terms.html",
     "app.js"
   ],
-  "scannedIconCount": 82,
+  "scannedIconCount": 85,
   "scannedIcons": [
     "activity",
     "alert-triangle",
@@ -23,6 +23,7 @@
     "check-circle",
     "check-circle-2",
     "chevron-right",
+    "circle-dot",
     "clipboard-check",
     "clipboard-copy",
     "clock",
@@ -35,6 +36,7 @@
     "download",
     "external-link",
     "eye",
+    "file",
     "film",
     "filter-x",
     "flame",
@@ -49,6 +51,7 @@
     "info",
     "instagram",
     "key-round",
+    "layers",
     "layout-list",
     "lightbulb",
     "line-chart",
@@ -91,9 +94,7 @@
     "x",
     "zap"
   ],
-  "unresolvedDynamicReferences": [
-    "app.js: data-lucide=\"${fmtIcon}"
-  ],
+  "unresolvedDynamicReferences": [],
   "missingExports": [],
   "customIcons": [
     "instagram"
