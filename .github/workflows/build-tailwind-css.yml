@@ -26,10 +26,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -49,7 +49,7 @@ jobs:
           print(f'gzip_bytes={len(gzip.compress(data, compresslevel=9))}')
           PY
 
-      - name: Replace Tailwind CDN with static CSS
+      - name: Ensure Tailwind CDN cutover
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -59,11 +59,17 @@ jobs:
           for name in ('index.html', 'pricing.html'):
               path = Path(name)
               text = path.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{name}: expected exactly one Tailwind CDN tag, found {count}')
-              path.write_text(text.replace(old, new))
-              print(f'{name}: replaced Tailwind runtime CDN with static CSS')
+              old_count = text.count(old)
+              new_count = text.count(new)
+              if old_count == 1 and new_count == 0:
+                  path.write_text(text.replace(old, new))
+                  print(f'{name}: replaced Tailwind runtime CDN with static CSS')
+              elif old_count == 0 and new_count == 1:
+                  print(f'{name}: static Tailwind CSS already active')
+              else:
+                  raise SystemExit(
+                      f'{name}: unexpected Tailwind tags old={old_count} new={new_count}'
+                  )
           PY
 
       - name: Commit generated CSS and cutover when changed
@@ -75,5 +81,5 @@ jobs:
             echo 'Generated CSS and HTML cutover are unchanged.'
             exit 0
           fi
-          git commit -m 'perf: replace Tailwind runtime CDN with static CSS'
+          git commit -m 'perf: regenerate static Tailwind CSS'
           git push
