@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   build-tailwind:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,7 +34,7 @@ jobs:
           node-version: '22'
 
       - name: Install exact Tailwind compiler
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Generate minified production CSS
         run: npm run build:css
@@ -48,14 +49,31 @@ jobs:
           print(f'gzip_bytes={len(gzip.compress(data, compresslevel=9))}')
           PY
 
-      - name: Commit generated CSS when changed
+      - name: Replace Tailwind CDN with static CSS
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = '<script src="https://cdn.tailwindcss.com"></script>'
+          new = '<link rel="stylesheet" href="/tailwind.generated.css" />'
+          for name in ('index.html', 'pricing.html'):
+              path = Path(name)
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{name}: expected exactly one Tailwind CDN tag, found {count}')
+              path.write_text(text.replace(old, new))
+              print(f'{name}: replaced Tailwind runtime CDN with static CSS')
+          PY
+
+      - name: Commit generated CSS and cutover when changed
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tailwind.generated.css package-lock.json
+          git add tailwind.generated.css package-lock.json index.html pricing.html
           if git diff --cached --quiet; then
-            echo 'Generated CSS is unchanged.'
+            echo 'Generated CSS and HTML cutover are unchanged.'
             exit 0
           fi
-          git commit -m 'chore: generate static Tailwind CSS'
+          git commit -m 'perf: replace Tailwind runtime CDN with static CSS'
           git push
