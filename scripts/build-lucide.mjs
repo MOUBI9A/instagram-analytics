@@ -5,7 +5,15 @@ import * as lucide from 'lucide';
 
 const sourceFiles = ['index.html', 'pricing.html', 'privacy.html', 'terms.html', 'app.js'];
 const literalIconNames = new Set();
-const dynamicReferences = [];
+const unresolvedDynamicReferences = [];
+
+// Dynamic icon sources verified in app.js:
+// - cached-data banner switches between database / clock
+// - command palette renders c.icon; the icon values are captured by the
+//   object-literal scanner below (search/bookmark/git-compare/archive/zap/
+//   lightbulb/sparkles/compass).
+const explicitDynamicSafelist = ['database', 'clock'];
+for (const name of explicitDynamicSafelist) literalIconNames.add(name);
 
 for (const file of sourceFiles) {
   const text = await readFile(file, 'utf8');
@@ -14,13 +22,18 @@ for (const file of sourceFiles) {
     literalIconNames.add(match[1].toLowerCase());
   }
 
-  for (const match of text.matchAll(/data-lucide\s*=\s*["'`]([^"'`]*)\$\{/g)) {
-    dynamicReferences.push(`${file}: ${match[0]}`);
+  for (const match of text.matchAll(/data-lucide\s*=\s*["'`]([^"'`]*)\$\{([^}]*)\}/g)) {
+    const expression = match[2];
+    const isKnownConditional = expression.includes('data.from_cache') && expression.includes('database') && expression.includes('clock');
+    const isCommandPaletteIcon = expression.trim() === 'c.icon';
+    if (!isKnownConditional && !isCommandPaletteIcon) {
+      unresolvedDynamicReferences.push(`${file}: ${match[0]}`);
+    }
   }
 
-  // Existing rendering helpers also keep icon names in object literals.
-  // Add only values that resolve to a real Lucide export so unrelated
-  // application `icon:` fields cannot inflate or break the bundle.
+  // Existing rendering helpers keep command-palette icon names in object
+  // literals. Add only values that resolve to a real Lucide export so
+  // unrelated application `icon:` fields cannot inflate the bundle.
   for (const match of text.matchAll(/\bicon\s*:\s*["']([a-z0-9-]+)["']/gi)) {
     const name = match[1].toLowerCase();
     const exportName = toExportName(name);
@@ -28,9 +41,9 @@ for (const file of sourceFiles) {
   }
 }
 
-if (dynamicReferences.length) {
+if (unresolvedDynamicReferences.length) {
   throw new Error(
-    `Dynamic data-lucide references need an explicit safelist before bundling:\n${dynamicReferences.join('\n')}`,
+    `Unresolved dynamic data-lucide references need an explicit safelist:\n${unresolvedDynamicReferences.join('\n')}`,
   );
 }
 
