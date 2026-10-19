@@ -1,0 +1,41 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './index.html',
+    './pricing.html',
+    './privacy.html',
+    './terms.html',
+    './app.js',
+  ],
+  safelist: [
+    // Runtime UI state classes injected/toggled from app.js.
+    'hidden',
+    'flex',
+    'block',
+    'inline-flex',
+    'grid',
+    'relative',
+    'animate-spin',
+    'bg-emerald-400',
+    'bg-slate-500',
+    'text-emerald-300',
+    'text-sky-300',
+    'text-rose-300',
+    'text-amber-200',
+    'text-fuchsia-200',
+    'bg-sky-500/10',
+    'bg-rose-500/10',
+    'bg-amber-500/10',
+    'bg-fuchsia-500/10',
+    'border-sky-400/30',
+    'border-rose-400/30',
+    'border-amber-400/30',
+    'border-fuchsia-400/30',
+    'from-emerald-500/10',
+    'to-fuchsia-500/10',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};

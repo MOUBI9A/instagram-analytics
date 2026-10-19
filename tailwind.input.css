@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  /* Runtime Tailwind CDN injected utilities after styles.css; preserve that
+     effective precedence for glass drawers when switching to static CSS. */
+  .glass-card.fixed {
+    position: fixed;
+  }
+}

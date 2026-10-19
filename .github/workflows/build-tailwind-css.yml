@@ -1,0 +1,85 @@
+name: Build static Tailwind CSS
+
+on:
+  push:
+    branches:
+      - perf/static-tailwind-2026-10-19
+    paths:
+      - index.html
+      - pricing.html
+      - privacy.html
+      - terms.html
+      - app.js
+      - tailwind.input.css
+      - tailwind.config.cjs
+      - package.json
+      - .github/workflows/build-tailwind-css.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-tailwind:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Install exact Tailwind compiler
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Generate minified production CSS
+        run: npm run build:css
+
+      - name: Report artifact size
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          data = Path('tailwind.generated.css').read_bytes()
+          print(f'raw_bytes={len(data)}')
+          print(f'gzip_bytes={len(gzip.compress(data, compresslevel=9))}')
+          PY
+
+      - name: Ensure Tailwind CDN cutover
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = '<script src="https://cdn.tailwindcss.com"></script>'
+          new = '<link rel="stylesheet" href="/tailwind.generated.css" />'
+          for name in ('index.html', 'pricing.html'):
+              path = Path(name)
+              text = path.read_text()
+              old_count = text.count(old)
+              new_count = text.count(new)
+              if old_count == 1 and new_count == 0:
+                  path.write_text(text.replace(old, new))
+                  print(f'{name}: replaced Tailwind runtime CDN with static CSS')
+              elif old_count == 0 and new_count == 1:
+                  print(f'{name}: static Tailwind CSS already active')
+              else:
+                  raise SystemExit(
+                      f'{name}: unexpected Tailwind tags old={old_count} new={new_count}'
+                  )
+          PY
+
+      - name: Commit generated CSS and cutover when changed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tailwind.generated.css package-lock.json index.html pricing.html
+          if git diff --cached --quiet; then
+            echo 'Generated CSS and HTML cutover are unchanged.'
+            exit 0
+          fi
+          git commit -m 'perf: regenerate static Tailwind CSS'
+          git push
